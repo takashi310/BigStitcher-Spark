@@ -50,6 +50,8 @@ import net.preibisch.mvrecon.process.export.ExportTools;
 import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
 import net.preibisch.mvrecon.process.fusion.FusionTools;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
+import net.preibisch.mvrecon.process.fusion.transformed.fusion;
+import net.preibisch.mvrecon.process.fusion.transformed.Fusion.FIRST_WINS;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
@@ -132,6 +134,8 @@ public class AffineFusion implements Callable<Void>, Serializable
 	@Override
 	public Void call() throws Exception
 	{
+		net.preibisch.mvrecon.process.fusion.transformed.fusion = net.preibisch.mvrecon.process.fusion.transformed.Fusion.FIRST_WINS;
+	
 		if ( (this.n5Dataset == null && this.bdvString == null) || (this.n5Dataset != null && this.bdvString != null) )
 		{
 			System.out.println( "You must define either the n5dataset (e.g. -d /ch488/s0) - OR - the BigDataViewer specification (e.g. --bdv 0,1)");
