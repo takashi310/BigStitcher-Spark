@@ -411,14 +411,12 @@ public class AffineFusion implements Callable<Void>, Serializable
 					// nothing to save...
 					if ( viewIdsLocal.size() == 0 )
 						return;
-					final FusedRandomAccessibleInterval fused_source = FusionTools.fuseVirtual(
+					final RandomAccessibleInterval<FloatType> source = FusionTools.fuseVirtual(
 								dataLocal,
 								viewIdsLocal,
 								new FinalInterval(minBB, maxBB)
 					);
-					
-					fused_source.fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
-					final RandomAccessibleInterval<FloatType> source = fused_source;
+					((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
 					final N5Writer executorVolumeWriter = N5Util.createWriter( n5Path, storageType );
 
