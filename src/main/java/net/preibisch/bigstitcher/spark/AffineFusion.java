@@ -135,7 +135,6 @@ public class AffineFusion implements Callable<Void>, Serializable
 	@Override
 	public Void call() throws Exception
 	{
-		net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval.fusion = net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 		FusionTools.defaultBlendingRange = 950;
 	
 		if ( (this.n5Dataset == null && this.bdvString == null) || (this.n5Dataset != null && this.bdvString != null) )
@@ -412,11 +411,14 @@ public class AffineFusion implements Callable<Void>, Serializable
 					// nothing to save...
 					if ( viewIdsLocal.size() == 0 )
 						return;
-					final RandomAccessibleInterval<FloatType> source = FusionTools.fuseVirtual(
+					final FusedRandomAccessibleInterval<FloatType> fused_source = FusionTools.fuseVirtual(
 								dataLocal,
 								viewIdsLocal,
 								new FinalInterval(minBB, maxBB)
 					);
+					
+					fused_source.fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
+					final RandomAccessibleInterval<FloatType> source = fused_source;
 
 					final N5Writer executorVolumeWriter = N5Util.createWriter( n5Path, storageType );
 
