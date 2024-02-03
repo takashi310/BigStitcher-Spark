@@ -411,7 +411,7 @@ public class AffineFusion implements Callable<Void>, Serializable
 					// nothing to save...
 					if ( viewIdsLocal.size() == 0 )
 						return;
-					final FusedRandomAccessibleInterval<FloatType> fused_source = FusionTools.fuseVirtual(
+					final FusedRandomAccessibleInterval fused_source = FusionTools.fuseVirtual(
 								dataLocal,
 								viewIdsLocal,
 								new FinalInterval(minBB, maxBB)
