@@ -51,7 +51,7 @@ import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
 import net.preibisch.mvrecon.process.fusion.FusionTools;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 
-import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval
+import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
