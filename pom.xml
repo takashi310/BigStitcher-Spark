@@ -226,6 +226,14 @@
                     <groupId>com.esotericsoftware</groupId>
                     <artifactId>reflectasm</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>com.esotericsoftware</groupId>
+                    <artifactId>kryo</artifactId>
+                </exclusion>
+                <exclusion>
+                        <groupId>com.esotericsoftware</groupId>
+                        <artifactId>kryo</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
