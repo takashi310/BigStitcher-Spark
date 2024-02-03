@@ -51,6 +51,8 @@ import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
 import net.preibisch.mvrecon.process.fusion.FusionTools;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 
+import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval
+
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
@@ -133,6 +135,7 @@ public class AffineFusion implements Callable<Void>, Serializable
 	@Override
 	public Void call() throws Exception
 	{
+		net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval.fusion = net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 		FusionTools.defaultBlendingRange = 950;
 	
 		if ( (this.n5Dataset == null && this.bdvString == null) || (this.n5Dataset != null && this.bdvString != null) )
