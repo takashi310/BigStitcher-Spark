@@ -119,6 +119,9 @@ public class AffineFusion implements Callable<Void>, Serializable
 	// TODO: make a variable just as -s is
 	@Option(names = { "--UINT16" }, description = "save as UINT16 [0...65535], if you choose it you must define min and max intensity (default: fuse as 32 bit float)")
 	private boolean uint16 = false;
+	
+	@Option(names = { "--oneTileWins" }, description = "activate the one-tile-wins strategy")
+	private boolean oneTileWins = false;
 
 	@Option(names = { "--UINT8" }, description = "save as UINT8 [0...255], if you choose it you must define min and max intensity (default: fuse as 32 bit float)")
 	private boolean uint8 = false;
@@ -416,7 +419,8 @@ public class AffineFusion implements Callable<Void>, Serializable
 								viewIdsLocal,
 								new FinalInterval(minBB, maxBB)
 					);
-					((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
+					if ( oneTileWins )
+						((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
 					final N5Writer executorVolumeWriter = N5Util.createWriter( n5Path, storageType );
 
