@@ -33,6 +33,7 @@ import net.imglib2.type.numeric.integer.UnsignedShortType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Util;
 import net.imglib2.view.Views;
+import net.preibisch.bigstitcher.spark.abstractcmdline.AbstractBasic;
 import net.preibisch.bigstitcher.spark.util.Grid;
 import net.preibisch.bigstitcher.spark.util.Import;
 import net.preibisch.bigstitcher.spark.util.Spark;
@@ -44,7 +45,7 @@ import net.preibisch.mvrecon.process.interestpointregistration.pairwise.constell
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
-public class ResaveN5 implements Callable<Void>, Serializable
+public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Serializable
 {
 	/*
 	-x '/Users/preibischs/Documents/Microscopy/Stitching/Truman/testspark/dataset.xml'
@@ -54,17 +55,14 @@ public class ResaveN5 implements Callable<Void>, Serializable
 
 	private static final long serialVersionUID = 1890656279324908516L;
 
-	@Option(names = { "-x", "--xml" }, required = true, description = "path to the BigStitcher xml, e.g. /home/project.xml")
-	private String xmlPath = null;
-
 	@Option(names = { "-xo", "--xmlout" }, required = true, description = "path to the output BigStitcher xml, e.g. /home/project-n5.xml")
 	private String xmloutPath = null;
 
 	@Option(names = "--blockSize", description = "blockSize, you can use smaller blocks for HDF5 (default: 128,128,64)")
 	private String blockSizeString = "128,128,64";
 
-	@Option(names = "--blockScale", description = "how many blocks to use for a single processing step, e.g. 4,4,1 means for blockSize a 128,128,32 that each spark thread writes 512,512,32 (default: 1,1,1)")
-	private String blockScaleString = "2,2,1";
+	@Option(names = "--blockScale", description = "how many blocks to use for a single processing step, e.g. 4,4,1 means for blockSize a 128,128,32 that each spark thread writes 512,512,32 (default: 16,16,1)")
+	private String blockScaleString = "16,16,1";
 
 	@Option(names = { "-ds", "--downsampling" }, description = "downsampling pyramid (must contain full res 1,1,1 that is always created), e.g. 1,1,1; 2,2,1; 4,4,1; 8,8,2 (default: automatically computed)")
 	private String downsampling = null;
@@ -75,30 +73,41 @@ public class ResaveN5 implements Callable<Void>, Serializable
 	@Override
 	public Void call() throws Exception
 	{
-		final SpimData2 data = Spark.getSparkJobSpimData2("", xmlPath);
+		final SpimData2 dataGlobal = this.loadSpimData2();
+
+		if ( dataGlobal == null )
+			return null;
 
 		// process all views
-		final ArrayList< ViewId > viewIds = Import.getViewIds( data );
+		final ArrayList< ViewId > viewIdsGlobal = Import.getViewIds( dataGlobal );
 
-		if ( viewIds.size() == 0 )
+		if ( viewIdsGlobal.size() == 0 )
 		{
 			throw new IllegalArgumentException( "No views to resave." );
 		}
 		else
 		{
 			System.out.println( "Following ViewIds will be resaved: ");
-			for ( final ViewId v : viewIds )
+			for ( final ViewId v : viewIdsGlobal )
 				System.out.print( "[" + v.getTimePointId() + "," + v.getViewSetupId() + "] " );
 			System.out.println();
 		}
 
-		final String n5Path = this.n5Path == null ? data.getBasePath() + "/dataset.n5" : this.n5Path;
+		final String n5Path = this.n5Path == null ? dataGlobal.getBasePath() + "/dataset.n5" : this.n5Path;
 		final Compression compression = new GzipCompression( 1 );
 
 		final int[] blockSize = Import.csvStringToIntArray(blockSizeString);
 		final int[] blockScale = Import.csvStringToIntArray(blockScaleString);
 
+		final int[] computeBlock = new int[] {
+				blockSize[0] * blockScale[ 0 ],
+				blockSize[1] * blockScale[ 1 ],
+				blockSize[2] * blockScale[ 2 ] };
+
 		final N5Writer n5 = new N5FSWriter(n5Path);
+
+		System.out.println( "N5 block size=" + Util.printCoordinates( blockSize ) );
+		System.out.println( "Compute block size=" + Util.printCoordinates( computeBlock ) );
 
 		System.out.println( "Setting up N5 write for basepath: " + n5Path );
 
@@ -111,17 +120,13 @@ public class ResaveN5 implements Callable<Void>, Serializable
 		// all ViewSetups for estimating downsampling
 		final List< ViewSetup > viewSetups = new ArrayList<>();
 
-		for ( final ViewId viewId : viewIds )
+		for ( final ViewId viewId : viewIdsGlobal )
 		{
-			final ViewDescription vd = data.getSequenceDescription().getViewDescription( viewId );
+			final ViewDescription vd = dataGlobal.getSequenceDescription().getViewDescription( viewId );
 
 			final List<long[][]> grid = Grid.create(
 					vd.getViewSetup().getSize().dimensionsAsLongArray(),
-					new int[] {
-							blockSize[0] * blockScale[ 0 ],
-							blockSize[1] * blockScale[ 1 ],
-							blockSize[2] * blockScale[ 2 ]
-					},
+					computeBlock,
 					blockSize);
 
 			// add timepointId and ViewSetupId & dimensions to the gridblock
@@ -166,10 +171,16 @@ public class ResaveN5 implements Callable<Void>, Serializable
 		for ( int i = 0; i < downsampling.length; ++i )
 			System.out.println( Util.printCoordinates( downsampling[i] ) );
 
+		if ( dryRun )
+		{
+			System.out.println( "This is a dry-run, stopping here.");
+			return null;
+		}
+
 		// create one dataset per ViewSetupId
 		for ( final Entry<Integer, long[]> viewSetup: viewSetupIdToDimensions.entrySet() )
 		{
-			final Object type = data.getSequenceDescription().getImgLoader().getSetupImgLoader( viewSetup.getKey() ).getImageType();
+			final Object type = dataGlobal.getSequenceDescription().getImgLoader().getSetupImgLoader( viewSetup.getKey() ).getImageType();
 			final DataType dataType;
 
 			if ( UnsignedShortType.class.isInstance( type ) )
@@ -198,7 +209,7 @@ public class ResaveN5 implements Callable<Void>, Serializable
 		}
 
 		// create all image (s0) datasets
-		for ( final ViewId viewId : viewIds )
+		for ( final ViewId viewId : viewIdsGlobal )
 		{
 			System.out.println( "Creating dataset for " + Group.pvid( viewId ) );
 			
@@ -275,8 +286,11 @@ public class ResaveN5 implements Callable<Void>, Serializable
 					}
 					else
 					{
+						n5Lcl.close();
 						throw new RuntimeException("Unsupported pixel type: " + dataType );
 					}
+
+					System.out.println( "ViewId " + Group.pvid( viewId ) + ", written block: offset=" + Util.printCoordinates( gridBlock[0] ) + ", dimension=" + Util.printCoordinates( gridBlock[1] ) );
 				});
 
 		System.out.println( "Resaved N5 s0 level, took: " + (System.currentTimeMillis() - time ) + " ms." );
@@ -297,7 +311,7 @@ public class ResaveN5 implements Callable<Void>, Serializable
 			final ArrayList<long[][]> allGridsDS = new ArrayList<>();
 
 			// adjust dimensions
-			for ( final ViewId viewId : viewIds )
+			for ( final ViewId viewId : viewIdsGlobal )
 			{
 				final long[] previousDim = n5.getAttribute( "setup" + viewId.getViewSetupId() + "/timepoint" + viewId.getTimePointId() + "/s" + (level-1), "dimensions", long[].class );
 				final long[] dim = new long[ previousDim.length ];
@@ -405,6 +419,7 @@ public class ResaveN5 implements Callable<Void>, Serializable
 						}
 						else
 						{
+							n5Lcl.close();
 							throw new RuntimeException("Unsupported pixel type: " + dataType );
 						}
 					});
@@ -419,8 +434,10 @@ public class ResaveN5 implements Callable<Void>, Serializable
 		// things look good, let's save the new XML
 		System.out.println( "Saving new xml to: " + xmloutPath );
 
-		data.getSequenceDescription().setImgLoader( new N5ImageLoader( new File( n5Path ), data.getSequenceDescription()));
-		new XmlIoSpimData2( null ).save( data, xmloutPath );
+		dataGlobal.getSequenceDescription().setImgLoader( new N5ImageLoader( new File( n5Path ), dataGlobal.getSequenceDescription()));
+		new XmlIoSpimData2( null ).save( dataGlobal, xmloutPath );
+
+		n5.close();
 
 		Thread.sleep( 100 );
 		System.out.println( "Resaved project, in total took: " + (System.currentTimeMillis() - time ) + " ms." );
@@ -433,7 +450,7 @@ public class ResaveN5 implements Callable<Void>, Serializable
 
 		System.out.println(Arrays.toString(args));
 
-		System.exit(new CommandLine(new ResaveN5()).execute(args));
+		System.exit(new CommandLine(new SparkResaveN5()).execute(args));
 	}
 
 }

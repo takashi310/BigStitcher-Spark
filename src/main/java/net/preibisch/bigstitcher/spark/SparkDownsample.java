@@ -21,6 +21,7 @@ import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.util.Util;
 import net.imglib2.view.Views;
+import net.preibisch.bigstitcher.spark.abstractcmdline.AbstractBasic;
 import net.preibisch.bigstitcher.spark.util.DataTypeUtil;
 import net.preibisch.bigstitcher.spark.util.Grid;
 import net.preibisch.bigstitcher.spark.util.Import;
@@ -28,7 +29,7 @@ import net.preibisch.mvrecon.process.downsampling.lazy.LazyHalfPixelDownsample2x
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
-public class Downsample implements Callable<Void>, Serializable
+public class SparkDownsample extends AbstractBasic implements Callable<Void>, Serializable
 {
 	private static final long serialVersionUID = 5040141824053748124L;
 
@@ -50,6 +51,12 @@ public class Downsample implements Callable<Void>, Serializable
 	@Override
 	public Void call() throws Exception
 	{
+		if (dryRun)
+		{
+			System.out.println( "dry-run not supported for downsampling.");
+			System.exit( 0 );
+		}
+
 		if ( n5DatasetsOut == null || downsampling == null || n5DatasetsOut.size() != downsampling.size() )
 		{
 			System.out.println( "Please specify as many n5DatasetOut as you specify downsampling steps.");
@@ -156,7 +163,7 @@ public class Downsample implements Callable<Void>, Serializable
 
 		System.out.println(Arrays.toString(args));
 
-		System.exit(new CommandLine(new Downsample()).execute(args));
+		System.exit(new CommandLine(new SparkDownsample()).execute(args));
 	}
 
 }

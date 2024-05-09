@@ -48,13 +48,7 @@ public class Import {
 			final boolean uint8,
 			final boolean uint16,
 			final Double minIntensity,
-			final Double maxIntensity,
-			final String[] vi,
-			final String angleIds, 
-			final String channelIds,
-			final String illuminationIds,
-			final String tileIds,
-			final String timepointIds )
+			final Double maxIntensity )
 			throws IllegalArgumentException
 	{
 		if ( uint8 && uint16 ) {
@@ -64,7 +58,17 @@ public class Import {
 		if ( ( uint8 || uint16 ) && (minIntensity == null || maxIntensity == null ) ) {
 			throw new IllegalArgumentException( "When selecting UINT8 or UINT16 you need to specify minIntensity and maxIntensity." );
 		}
+	}
 
+	public static void validateInputParameters(
+			final String[] vi,
+			final String angleIds, 
+			final String channelIds,
+			final String illuminationIds,
+			final String tileIds,
+			final String timepointIds )
+			throws IllegalArgumentException
+	{
 		if ( vi != null &&
 			 ( angleIds != null || tileIds != null || illuminationIds != null || timepointIds != null || channelIds != null ) ) {
 			throw new IllegalArgumentException( "You can only specify ViewIds (-vi) OR angles, channels, illuminations, tiles, timepoints." );
@@ -87,6 +91,7 @@ public class Import {
 			System.out.println( "Parsing selected ViewIds ... ");
 			ArrayList<ViewId> parsedViews = Import.getViewIds( vi );
 			viewIds = Import.getViewIds( data, parsedViews );
+			System.out.println( "Warning: only " + viewIds.size() + " of " + parsedViews.size() + " that you specified exist and are present.");
 		}
 		else if ( angleIds != null || tileIds != null || illuminationIds != null || timepointIds != null || channelIds != null )
 		{
@@ -210,6 +215,10 @@ public class Import {
 
 	public static int[] csvStringToIntArray(final String csvString) {
 		return Arrays.stream(csvString.split(",")).map( st -> st.trim() ).mapToInt(Integer::parseInt).toArray();
+	}
+
+	public static double[] csvStringToDoubleArray(final String csvString) {
+		return Arrays.stream(csvString.split(",")).map( st -> st.trim() ).mapToDouble(Double::parseDouble).toArray();
 	}
 
 	/**

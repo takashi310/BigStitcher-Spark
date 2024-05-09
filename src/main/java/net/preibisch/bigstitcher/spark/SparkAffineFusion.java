@@ -15,40 +15,26 @@ import org.janelia.saalfeldlab.n5.DataType;
 import org.janelia.saalfeldlab.n5.GzipCompression;
 import org.janelia.saalfeldlab.n5.N5FSWriter;
 import org.janelia.saalfeldlab.n5.N5Writer;
-import org.janelia.saalfeldlab.n5.hdf5.N5HDF5Writer;
-import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
-import org.janelia.saalfeldlab.n5.zarr.N5ZarrWriter;
 
 import mpicbg.spim.data.SpimDataException;
-import mpicbg.spim.data.registration.ViewRegistration;
-import mpicbg.spim.data.registration.ViewTransformAffine;
 import mpicbg.spim.data.sequence.ViewId;
 import net.imglib2.FinalDimensions;
 import net.imglib2.FinalInterval;
-import net.imglib2.Interval;
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.converter.Converters;
-import net.imglib2.realtransform.AffineTransform3D;
-import net.imglib2.type.numeric.integer.ShortType;
-import net.imglib2.type.numeric.integer.UnsignedByteType;
-import net.imglib2.type.numeric.integer.UnsignedShortType;
-import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
-import net.imglib2.view.Views;
+import net.preibisch.bigstitcher.spark.abstractcmdline.AbstractSelectableViews;
+import net.preibisch.bigstitcher.spark.fusion.WriteSuperBlock;
+import net.preibisch.bigstitcher.spark.fusion.WriteSuperBlockMasks;
 import net.preibisch.bigstitcher.spark.util.BDVSparkInstantiateViewSetup;
 import net.preibisch.bigstitcher.spark.util.Downsampling;
 import net.preibisch.bigstitcher.spark.util.Grid;
 import net.preibisch.bigstitcher.spark.util.Import;
 import net.preibisch.bigstitcher.spark.util.N5Util;
 import net.preibisch.bigstitcher.spark.util.Spark;
-import net.preibisch.bigstitcher.spark.util.ViewUtil;
 import net.preibisch.mvrecon.fiji.spimdata.SpimData2;
 import net.preibisch.mvrecon.fiji.spimdata.boundingbox.BoundingBox;
 import net.preibisch.mvrecon.process.export.ExportN5API.StorageType;
 import net.preibisch.mvrecon.process.export.ExportTools;
 import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
-import net.preibisch.mvrecon.process.fusion.FusionTools;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 
 import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval;
@@ -56,12 +42,9 @@ import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInt
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
-public class AffineFusion implements Callable<Void>, Serializable
+public class SparkAffineFusion extends AbstractSelectableViews implements Callable<Void>, Serializable
 {
 	private static final long serialVersionUID = -6103761116219617153L;
-
-	@Option(names = { "-x", "--xml" }, required = true, description = "Path to the existing BigStitcher project xml, e.g. -x /home/project.xml")
-	private String xmlPath = null;
 
 	@Option(names = { "-o", "--n5Path" }, required = true, description = "N5/ZARR/HDF5 basse path for saving (must be combined with the option '-d' or '--bdv'), e.g. -o /home/fused.n5")
 	private String n5Path = null;
@@ -82,27 +65,11 @@ public class AffineFusion implements Callable<Void>, Serializable
 	@Option(names = "--blockSize", description = "blockSize, you can use smaller blocks for HDF5 (default: 128,128,128)")
 	private String blockSizeString = "128,128,128";
 
+	@Option(names = "--blockScale", description = "how many blocks to use for a single processing step, e.g. 4,4,1 means for blockSize a 128,128,64 that each spark thread writes 512,512,64 (default: 4,4,1)")
+	private String blockScaleString = "4,4,1";
+
 	@Option(names = { "-b", "--boundingBox" }, description = "fuse a specific bounding box listed in the XML (default: fuse everything)")
 	private String boundingBoxName = null;
-	
-	@Option(names = { "--angleId" }, description = "list the angle ids that should be fused into a single image, you can find them in the XML, e.g. --angleId '0,1,2' (default: all angles)")
-	private String angleIds = null;
-
-	@Option(names = { "--tileId" }, description = "list the tile ids that should be fused into a single image, you can find them in the XML, e.g. --tileId '0,1,2' (default: all tiles)")
-	private String tileIds = null;
-
-	@Option(names = { "--illuminationId" }, description = "list the illumination ids that should be fused into a single image, you can find them in the XML, e.g. --illuminationId '0,1,2' (default: all illuminations)")
-	private String illuminationIds = null;
-
-	@Option(names = { "--channelId" }, description = "list the channel ids that should be fused into a single image, you can find them in the XML (usually just ONE!), e.g. --channelId '0,1,2' (default: all channels)")
-	private String channelIds = null;
-
-	@Option(names = { "--timepointId" }, description = "list the timepoint ids that should be fused into a single image, you can find them in the XML (usually just ONE!), e.g. --timepointId '0,1,2' (default: all time points)")
-	private String timepointIds = null;
-
-	@Option(names = { "-vi" }, description = "specifically list the view ids (time point, view setup) that should be fused into a single image, e.g. -vi '0,0' -vi '0,1' (default: all view ids)")
-	private String[] vi = null;
-
 
 	@Option(names = { "--multiRes" }, description = "Automatically create a multi-resolution pyramid (default: false)")
 	private boolean multiRes = false;
@@ -132,52 +99,64 @@ public class AffineFusion implements Callable<Void>, Serializable
 	@Option(names = { "--maxIntensity" }, description = "max intensity for scaling values to the desired range (required for UINT8 and UINT16), e.g. 2048.0")
 	private Double maxIntensity = null;
 
-	// TODO: support create downsampling pyramids, null is fine for now
+	@Option(names = { "--masks" }, description = "save only the masks (this will not fuse the images)")
+	private boolean masks = false;
+
+	@Option(names = "--maskOffset", description = "allows to make masks larger (+, the mask will include some background) or smaller (-, some fused content will be cut off), warning: in the non-isotropic coordinate space of the raw input images (default: 0.0,0.0,0.0)")
+	private String maskOffset = "0.0,0.0,0.0";
+
+	// TODO: support create custom downsampling pyramids, null is fine for now (used by multiRes later)
 	private int[][] downsamplings;
+
+
+	/**
+	 * Assumes that
+	 * at most 8 views are required per output block, and
+	 * at most 8 input blocks per output block are required from one input view per output block.
+	 */
+	//static final int N_PREFETCH_THREADS = 72;
 
 	@Override
 	public Void call() throws Exception
 	{
 		FusionTools.defaultBlendingRange = 950;
-	
+		if (dryRun)
+		{
+			System.out.println( "dry-run not supported for affine fusion.");
+			System.exit( 0 );
+		}
 		if ( (this.n5Dataset == null && this.bdvString == null) || (this.n5Dataset != null && this.bdvString != null) )
 		{
 			System.out.println( "You must define either the n5dataset (e.g. -d /ch488/s0) - OR - the BigDataViewer specification (e.g. --bdv 0,1)");
 			return null;
 		}
 
-		Import.validateInputParameters(uint8, uint16, minIntensity, maxIntensity, vi, angleIds, channelIds, illuminationIds, tileIds, timepointIds);
-
-		if ( StorageType.HDF5.equals( storageType ) && bdvString != null && !uint16 )
+		if ( this.bdvString != null && xmlOutPath == null )
 		{
-			System.out.println( "BDV-compatible HDF5 only supports 16-bit output for now. Please use '--UINT16' flag for fusion." );
+			System.out.println( "Please specify the output XML for the BDV dataset: -xo");
 			return null;
 		}
 
-		final SpimData2 data = Spark.getSparkJobSpimData2("", xmlPath);
+		Import.validateInputParameters(uint8, uint16, minIntensity, maxIntensity);
 
-		// select views to process
-		final ArrayList< ViewId > viewIds =
-				Import.createViewIds(
-						data, vi, angleIds, channelIds, illuminationIds, tileIds, timepointIds);
+		final SpimData2 dataGlobal = this.loadSpimData2();
 
-		if ( viewIds.size() == 0 )
-		{
-			throw new IllegalArgumentException( "No views to fuse." );
-		}
-		else
-		{
-			System.out.println( "Following ViewIds will be fused: ");
-			for ( final ViewId v : viewIds )
-				System.out.print( "[" + v.getTimePointId() + "," + v.getViewSetupId() + "] " );
-			System.out.println();
-		}
+		if ( dataGlobal == null )
+			return null;
 
-		BoundingBox boundingBox = Import.getBoundingBox( data, viewIds, boundingBoxName );
+		final ArrayList< ViewId > viewIdsGlobal = this.loadViewIds( dataGlobal );
+
+		if ( viewIdsGlobal == null || viewIdsGlobal.size() == 0 )
+			return null;
+
+		BoundingBox boundingBox = Import.getBoundingBox( dataGlobal, viewIdsGlobal, boundingBoxName );
 
 		final int[] blockSize = Import.csvStringToIntArray(blockSizeString);
-
-		System.out.println( "Fusing: " + boundingBox.getTitle() + ": " + Util.printInterval( boundingBox )  + " with blocksize " + Util.printCoordinates( blockSize ) );
+		final int[] blocksPerJob = Import.csvStringToIntArray(blockScaleString);
+		System.out.println( "Fusing: " + boundingBox.getTitle() +
+				": " + Util.printInterval( boundingBox ) +
+				" with blocksize " + Util.printCoordinates( blockSize ) +
+				" and " + Util.printCoordinates( blocksPerJob ) + " blocks per job" );
 
 		final DataType dataType;
 
@@ -185,11 +164,6 @@ public class AffineFusion implements Callable<Void>, Serializable
 		{
 			System.out.println( "Fusing to UINT8, min intensity = " + minIntensity + ", max intensity = " + maxIntensity );
 			dataType = DataType.UINT8;
-		}
-		else if ( uint16 && bdvString != null && StorageType.HDF5.equals( storageType ) )
-		{
-			System.out.println( "Fusing to INT16 (for BDV compliance, which is treated as UINT16), min intensity = " + minIntensity + ", max intensity = " + maxIntensity );
-			dataType = DataType.INT16;
 		}
 		else if ( uint16 )
 		{
@@ -201,6 +175,10 @@ public class AffineFusion implements Callable<Void>, Serializable
 			System.out.println( "Fusing to FLOAT32" );
 			dataType = DataType.FLOAT32;
 		}
+
+		final double[] maskOff = Import.csvStringToDoubleArray(maskOffset);
+		if ( masks )
+			System.out.println( "Fusing ONLY MASKS! Mask offset: " + Util.printCoordinates( maskOff ) );
 
 		//
 		// final variables for Spark
@@ -214,7 +192,7 @@ public class AffineFusion implements Callable<Void>, Serializable
 
 			if ( Double.isNaN( anisotropyFactor ) )
 			{
-				anisotropyFactor = TransformationTools.getAverageAnisotropyFactor( data, viewIds );
+				anisotropyFactor = TransformationTools.getAverageAnisotropyFactor( dataGlobal, viewIdsGlobal );
 
 				System.out.println( "Anisotropy factor [computed from data]: " + anisotropyFactor );
 			}
@@ -253,15 +231,10 @@ public class AffineFusion implements Callable<Void>, Serializable
 		//ImageJFunctions.show( virtual, Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() ) );
 		//SimpleMultiThreading.threadHaltUnClean();
 
-		final String n5Path = this.n5Path;
 		final String n5Dataset = this.n5Dataset != null ? this.n5Dataset : Import.createBDVPath( this.bdvString, this.storageType );
-		final String xmlPath = this.xmlPath;
-		final StorageType storageType = this.storageType;
 		final Compression compression = new GzipCompression( 1 );
 
-		final boolean uint8 = this.uint8;
-		final boolean uint16 = this.uint16;
-		final double minIntensity = (uint8 || uint16 ) ? this.minIntensity : 0;
+		final double minIntensity = ( uint8 || uint16 ) ? this.minIntensity : 0;
 		final double range;
 		if ( uint8 )
 			range = ( this.maxIntensity - this.minIntensity ) / 255.0;
@@ -271,9 +244,7 @@ public class AffineFusion implements Callable<Void>, Serializable
 			range = 0;
 
 		// TODO: improve (e.g. make ViewId serializable)
-		final int[][] serializedViewIds = Spark.serializeViewIds(viewIds);
-		final boolean useAF = preserveAnisotropy;
-		final double af = anisotropyFactor;
+		final int[][] serializedViewIds = Spark.serializeViewIds(viewIdsGlobal);
 
 		try
 		{
@@ -294,23 +265,14 @@ public class AffineFusion implements Callable<Void>, Serializable
 				dataType,
 				compression );
 
-		final List<long[][]> grid = Grid.create( dimensions, blockSize );
-
-		/*
-		// TODO: start doing this
-
 		// using bigger blocksizes than being stored for efficiency (needed for very large datasets)
-
+		final int[] superBlockSize = new int[ 3 ];
+		Arrays.setAll( superBlockSize, d -> blockSize[ d ] * blocksPerJob[ d ] );
 		final List<long[][]> grid = Grid.create(dimensions,
-				new int[] {
-						blockSize[0] * 4,
-						blockSize[1] * 4,
-						blockSize[2] * 4
-				},
+				superBlockSize,
 				blockSize);
-		*/
 
-		System.out.println( "numBlocks = " + grid.size() );
+		System.out.println( "numJobs = " + grid.size() );
 
 		driverVolumeWriter.setAttribute( n5Dataset, "offset", minBB );
 
@@ -334,8 +296,8 @@ public class AffineFusion implements Callable<Void>, Serializable
 						blockSize,
 						downsamplings,
 						viewId,
-						this.n5Path,
-						this.xmlOutPath,
+						n5Path,
+						xmlOutPath,
 						instantiate ) )
 				{
 					System.out.println( "Failed to write metadata for '" + n5Dataset + "'." );
@@ -362,114 +324,39 @@ public class AffineFusion implements Callable<Void>, Serializable
 		final JavaRDD<long[][]> rdd = sc.parallelize( grid );
 
 		final long time = System.currentTimeMillis();
-		rdd.foreach(
-				gridBlock -> {
-					// custom serialization
-					final SpimData2 dataLocal = Spark.getSparkJobSpimData2("", xmlPath);
+		
+		FusedRandomAccessibleInterval.fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
-					// be smarter, test which ViewIds are actually needed for the block we want to fuse
-					final Interval fusedBlock =
-							Intervals.translate(
-									Intervals.translate(
-											new FinalInterval( gridBlock[1] ), // blocksize
-											gridBlock[0] ), // block offset
-									minBB ); // min of the randomaccessbileinterval
-
-					// recover views to process
-					final ArrayList< ViewId > viewIdsLocal = new ArrayList<>();
-
-					for ( int i = 0; i < serializedViewIds.length; ++i )
-					{
-						final ViewId viewId = Spark.deserializeViewIds(serializedViewIds, i);
-
-						if ( useAF )
-						{
-							// get updated registration for views to fuse AND all other views that may influence the fusion
-							final ViewRegistration vr = dataLocal.getViewRegistrations().getViewRegistration( viewId );
-							final AffineTransform3D aniso = new AffineTransform3D();
-							aniso.set(
-									1.0, 0.0, 0.0, 0.0,
-									0.0, 1.0, 0.0, 0.0,
-									0.0, 0.0, 1.0/af, 0.0 );
-							vr.preconcatenateTransform( new ViewTransformAffine( "preserve anisotropy", aniso));
-							vr.updateModel();
-						}
-
-						// expand to be conservative ...
-						final Interval boundingBoxLocal = ViewUtil.getTransformedBoundingBox( dataLocal, viewId );
-						final Interval bounds = Intervals.expand( boundingBoxLocal, 2 );
-
-						if ( ViewUtil.overlaps( fusedBlock, bounds ) )
-						{
-							viewIdsLocal.add( viewId );
-
-							// TODO: which blocks exactly do we need and pre-fetch them using a simple getPixel call (or something like that) in the center of each block
-							// as long as the cache isn't cleared
-							// Tobi: keep the RA's to make sure that the cache can't be cleared - we want the outofmemory if that's the case
-						}
-					}
-
-					//SimpleMultiThreading.threadWait( 10000 );
-
-					// nothing to save...
-					if ( viewIdsLocal.size() == 0 )
-						return;
-					final RandomAccessibleInterval<FloatType> source = FusionTools.fuseVirtual(
-								dataLocal,
-								viewIdsLocal,
-								new FinalInterval(minBB, maxBB)
-					);
-					if ( oneTileWins )
-						((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
-
-					final N5Writer executorVolumeWriter = N5Util.createWriter( n5Path, storageType );
-
-					if ( uint8 )
-					{
-						final RandomAccessibleInterval< UnsignedByteType > sourceUINT8 =
-								Converters.convert(
-										source,(i, o) -> o.setReal( ( i.get() - minIntensity ) / range ),
-										new UnsignedByteType());
-
-						final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(sourceUINT8, gridBlock[0], gridBlock[1]);
-						//N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Writer, n5Dataset, gridBlock[2], new UnsignedByteType());
-						N5Utils.saveBlock(sourceGridBlock, executorVolumeWriter, n5Dataset, gridBlock[2]);
-					}
-					else if ( uint16 )
-					{
-						final RandomAccessibleInterval< UnsignedShortType > sourceUINT16 =
-								Converters.convert(
-										source,(i, o) -> o.setReal( ( i.get() - minIntensity ) / range ),
-										new UnsignedShortType());
-
-						if ( bdvString != null && StorageType.HDF5.equals( storageType ) )
-						{
-							// Tobias: unfortunately I store as short and treat it as unsigned short in Java.
-							// The reason is, that when I wrote this, the jhdf5 library did not support unsigned short. It's terrible and should be fixed.
-							// https://github.com/bigdataviewer/bigdataviewer-core/issues/154
-							// https://imagesc.zulipchat.com/#narrow/stream/327326-BigDataViewer/topic/XML.2FHDF5.20specification
-							final RandomAccessibleInterval< ShortType > sourceINT16 = 
-									Converters.convertRAI( sourceUINT16, (i,o)->o.set( i.getShort() ), new ShortType() );
-
-							final RandomAccessibleInterval<ShortType> sourceGridBlock = Views.offsetInterval(sourceINT16, gridBlock[0], gridBlock[1]);
-							N5Utils.saveBlock(sourceGridBlock, executorVolumeWriter, n5Dataset, gridBlock[2]);
-						}
-						else
-						{
-							final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(sourceUINT16, gridBlock[0], gridBlock[1]);
-							N5Utils.saveBlock(sourceGridBlock, executorVolumeWriter, n5Dataset, gridBlock[2]);
-						}
-					}
-					else
-					{
-						final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(source, gridBlock[0], gridBlock[1]);
-						N5Utils.saveBlock(sourceGridBlock, executorVolumeWriter, n5Dataset, gridBlock[2]);
-					}
-
-					// not HDF5
-					if ( N5Util.hdf5DriverVolumeWriter != executorVolumeWriter )
-						executorVolumeWriter.close();
-				});
+		if ( masks )
+			rdd.foreach( new WriteSuperBlockMasks(
+					xmlPath,
+					preserveAnisotropy,
+					anisotropyFactor,
+					minBB,
+					n5Path,
+					n5Dataset,
+					storageType,
+					serializedViewIds,
+					uint8,
+					uint16,
+					maskOff,
+					blockSize ) );
+		else
+			rdd.foreach( new WriteSuperBlock(
+				xmlPath,
+				preserveAnisotropy,
+				anisotropyFactor,
+				minBB,
+				n5Path,
+				n5Dataset,
+				bdvString,
+				storageType,
+				serializedViewIds,
+				uint8,
+				uint16,
+				minIntensity,
+				range,
+				blockSize ) );
 
 		if ( this.downsamplings != null )
 		{
@@ -493,8 +380,10 @@ public class AffineFusion implements Callable<Void>, Serializable
 		// close HDF5 writer
 		if ( N5Util.hdf5DriverVolumeWriter != null )
 			N5Util.hdf5DriverVolumeWriter.close();
+		else if ( multiRes )
+			System.out.println( "Saved, e.g. view with './n5-view -i " + n5Path + " -d " + n5Dataset.substring( 0, n5Dataset.length() - 3) + "'" );
 		else
-			System.out.println( "Saved, e.g. view with './n5-view -i " + n5Path + " -d " + n5Dataset );
+			System.out.println( "Saved, e.g. view with './n5-view -i " + n5Path + " -d " + n5Dataset + "'" );
 
 		System.out.println( "done, took: " + (System.currentTimeMillis() - time ) + " ms." );
 
@@ -510,7 +399,6 @@ public class AffineFusion implements Callable<Void>, Serializable
 
 		System.out.println(Arrays.toString(args));
 
-		System.exit(new CommandLine(new AffineFusion()).execute(args));
+		System.exit(new CommandLine(new SparkAffineFusion()).execute(args));
 	}
-
 }
