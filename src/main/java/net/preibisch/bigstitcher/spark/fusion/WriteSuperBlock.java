@@ -33,6 +33,9 @@ import net.preibisch.bigstitcher.spark.util.ViewUtil;
 import net.preibisch.mvrecon.fiji.spimdata.SpimData2;
 import net.preibisch.mvrecon.process.export.ExportN5API.StorageType;
 
+import net.preibisch.mvrecon.process.fusion.FusionTools;
+import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval;
+
 public class WriteSuperBlock implements VoidFunction< long[][] >
 {
 	private static final long serialVersionUID = 4185504467908084954L;
@@ -64,6 +67,8 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 	private final double range;
 
 	private final int[] blockSize;
+	
+	private boolean oneTileWins;
 
 	public WriteSuperBlock(
 			final String xmlPath,
@@ -79,7 +84,8 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 			final boolean uint16,
 			final double minIntensity,
 			final double range,
-			final int[] blockSize )
+			final int[] blockSize, 
+			final boolean oneTileWins )
 	{
 		this.xmlPath = xmlPath;
 		this.preserveAnisotropy = preserveAnisotropy;
@@ -95,6 +101,7 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 		this.minIntensity = minIntensity;
 		this.range = range;
 		this.blockSize = blockSize;
+		this.oneTileWins = oneTileWins;
 	}
 
 	/**
@@ -231,6 +238,9 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 						type,
 						minIntensity,
 						range );
+						
+				if ( oneTileWins )
+					((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
 				N5Helper.saveBlock( source, executorVolumeWriter, n5Dataset, gridPos );
 			}

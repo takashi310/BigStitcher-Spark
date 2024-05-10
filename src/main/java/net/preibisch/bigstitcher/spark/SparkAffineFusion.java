@@ -37,6 +37,7 @@ import net.preibisch.mvrecon.process.export.ExportTools;
 import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 
+import net.preibisch.mvrecon.process.fusion.FusionTools;
 import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval;
 
 import picocli.CommandLine;
@@ -324,8 +325,6 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 		final JavaRDD<long[][]> rdd = sc.parallelize( grid );
 
 		final long time = System.currentTimeMillis();
-		
-		FusedRandomAccessibleInterval.fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
 		if ( masks )
 			rdd.foreach( new WriteSuperBlockMasks(
@@ -340,7 +339,7 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 					uint8,
 					uint16,
 					maskOff,
-					blockSize ) );
+					blockSize, oneTileWins ) );
 		else
 			rdd.foreach( new WriteSuperBlock(
 				xmlPath,
