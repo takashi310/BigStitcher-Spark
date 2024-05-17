@@ -41,6 +41,8 @@ import net.preibisch.mvrecon.process.fusion.FusionTools;
 
 public class Fusion
 {
+	public static boolean ONE_TILE_WINS = false;
+
 	public static < T extends NativeType< T > > RandomAccessibleInterval< T > fuseVirtual(
 			final AbstractSpimData< ? > spimData,
 			final Collection< ? extends ViewId > views,
@@ -269,12 +271,21 @@ public class Fusion
 					{
 						System.arraycopy( imgBuffers[ i ], offset, tmpI, 0, sx );
 						blendings.get( i ).fill_range( tmpW, 0, sx, pos );
+						if (Fusion.ONE_TILE_WINS)
+							excludeW( sx, tmpW, sumW );
 						accW( sx, tmpW, sumW );
 						accI( sx, tmpW, tmpI, sumI );
 					}
 					fillOutputLine.compute( sumW, sumI, output, offset, sx );
 				}
 			}
+		}
+
+		private static void excludeW( final int sx, final float[] tmpW, final float[] sumW )
+		{
+			for ( int x = 0; x < sx; ++x )
+				if (sumW[ x ] > 0.0f)
+					tmpW[ x ] = 0.0f;
 		}
 
 		private static void accW( final int sx, final float[] tmpW, final float[] sumW )

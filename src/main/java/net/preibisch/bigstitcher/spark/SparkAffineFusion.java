@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import net.preibisch.bigstitcher.spark.blk.Fusion;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -38,7 +39,6 @@ import net.preibisch.mvrecon.process.export.ExportTools.InstantiateViewSetup;
 import net.preibisch.mvrecon.process.interestpointregistration.TransformationTools;
 
 import net.preibisch.mvrecon.process.fusion.FusionTools;
-import net.preibisch.mvrecon.process.fusion.transformed.FusedRandomAccessibleInterval;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
@@ -121,6 +121,9 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 	public Void call() throws Exception
 	{
 		FusionTools.defaultBlendingRange = 950;
+		if (oneTileWins)
+			Fusion.ONE_TILE_WINS = true;
+
 		if (dryRun)
 		{
 			System.out.println( "dry-run not supported for affine fusion.");
@@ -339,7 +342,7 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 					uint8,
 					uint16,
 					maskOff,
-					blockSize, oneTileWins ) );
+					blockSize ) );
 		else
 			rdd.foreach( new WriteSuperBlock(
 				xmlPath,

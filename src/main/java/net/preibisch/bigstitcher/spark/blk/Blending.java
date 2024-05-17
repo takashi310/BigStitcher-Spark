@@ -197,6 +197,8 @@ public class Blending
 
 		static float get( final float d )
 		{
+			if (Fusion.ONE_TILE_WINS)
+				return 1;
 			final int i = ( int ) ( d * n );
 			final float s = ( d * n ) - i;
 			return lookUp[ i ] * (1.0f - s) + lookUp[ i + 1 ] * s;

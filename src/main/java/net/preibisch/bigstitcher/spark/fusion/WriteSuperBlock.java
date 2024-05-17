@@ -67,8 +67,6 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 	private final double range;
 
 	private final int[] blockSize;
-	
-	private boolean oneTileWins;
 
 	public WriteSuperBlock(
 			final String xmlPath,
@@ -84,8 +82,7 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 			final boolean uint16,
 			final double minIntensity,
 			final double range,
-			final int[] blockSize, 
-			final boolean oneTileWins )
+			final int[] blockSize)
 	{
 		this.xmlPath = xmlPath;
 		this.preserveAnisotropy = preserveAnisotropy;
@@ -101,7 +98,6 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 		this.minIntensity = minIntensity;
 		this.range = range;
 		this.blockSize = blockSize;
-		this.oneTileWins = oneTileWins;
 	}
 
 	/**
@@ -238,9 +234,6 @@ public class WriteSuperBlock implements VoidFunction< long[][] >
 						type,
 						minIntensity,
 						range );
-						
-				if ( oneTileWins )
-					((FusedRandomAccessibleInterval) source).fusion = FusedRandomAccessibleInterval.Fusion.FIRST_WINS;
 
 				N5Helper.saveBlock( source, executorVolumeWriter, n5Dataset, gridPos );
 			}
