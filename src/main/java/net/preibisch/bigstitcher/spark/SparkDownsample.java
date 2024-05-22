@@ -1,17 +1,17 @@
 package net.preibisch.bigstitcher.spark;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.janelia.saalfeldlab.n5.Compression;
-import org.janelia.saalfeldlab.n5.DataType;
-import org.janelia.saalfeldlab.n5.N5FSWriter;
-import org.janelia.saalfeldlab.n5.N5Writer;
+import org.janelia.saalfeldlab.n5.*;
 import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 
 import mpicbg.spim.data.SpimDataException;
@@ -28,6 +28,8 @@ import net.preibisch.bigstitcher.spark.util.Import;
 import net.preibisch.mvrecon.process.downsampling.lazy.LazyHalfPixelDownsample2x;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
+
+import static net.preibisch.bigstitcher.spark.N5BlockValidateAndRetry.validateAndRetry;
 
 public class SparkDownsample extends AbstractBasic implements Callable<Void>, Serializable
 {
@@ -144,6 +146,10 @@ public class SparkDownsample extends AbstractBasic implements Callable<Void>, Se
 
 						final RandomAccessibleInterval sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, n5DatasetOut, gridBlock[2], (RealType & NativeType)DataTypeUtil.toType( dataTypeLcl ));
+
+						if (compression instanceof GzipCompression) {
+							validateAndRetry(sourceGridBlock, n5Lcl, n5DatasetOut, gridBlock[2], (RealType & NativeType)DataTypeUtil.toType( dataTypeLcl ), blockSize, 3, 3);
+						}
 					});
 
 			Thread.sleep( 100 );

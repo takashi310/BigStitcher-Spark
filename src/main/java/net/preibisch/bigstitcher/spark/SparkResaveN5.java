@@ -1,6 +1,8 @@
 package net.preibisch.bigstitcher.spark;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,15 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
+import java.util.zip.GZIPInputStream;
 
+import net.imglib2.type.NativeType;
+import net.imglib2.type.numeric.RealType;
+import net.preibisch.bigstitcher.spark.util.DataTypeUtil;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.janelia.saalfeldlab.n5.Compression;
-import org.janelia.saalfeldlab.n5.DataType;
-import org.janelia.saalfeldlab.n5.GzipCompression;
-import org.janelia.saalfeldlab.n5.N5FSWriter;
-import org.janelia.saalfeldlab.n5.N5Writer;
+import org.janelia.saalfeldlab.n5.*;
 import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 
 import bdv.export.ExportMipmapInfo;
@@ -44,6 +46,8 @@ import net.preibisch.mvrecon.process.downsampling.lazy.LazyHalfPixelDownsample2x
 import net.preibisch.mvrecon.process.interestpointregistration.pairwise.constellation.grouping.Group;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
+
+import static net.preibisch.bigstitcher.spark.N5BlockValidateAndRetry.validateAndRetry;
 
 public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Serializable
 {
@@ -271,18 +275,27 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 						@SuppressWarnings("unchecked")
 						final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType());
+						if (compression instanceof GzipCompression) {
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType(), blockSize, 3, 3);
+						}
 					}
 					else if ( dataType == DataType.UINT8 )
 					{
 						@SuppressWarnings("unchecked")
 						final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType());
+						if (compression instanceof GzipCompression) {
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType(), blockSize, 3, 3);
+						}
 					}
 					else if ( dataType == DataType.FLOAT32 )
 					{
 						@SuppressWarnings("unchecked")
 						final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType());
+						if (compression instanceof GzipCompression) {
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType(), blockSize, 3, 3);
+						}
 					}
 					else
 					{
@@ -384,6 +397,9 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 
 							final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 							N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType());
+							if (compression instanceof GzipCompression) {
+								validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType(), blockSize, 3, 3);
+							}
 						}
 						else if ( dataType == DataType.UINT8 )
 						{
@@ -400,6 +416,9 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 
 							final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 							N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType());
+							if (compression instanceof GzipCompression) {
+								validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType(), blockSize, 3, 3);
+							}
 						}
 						else if ( dataType == DataType.FLOAT32 )
 						{
@@ -416,6 +435,9 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 
 							final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 							N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType());
+							if (compression instanceof GzipCompression) {
+								validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType(), blockSize, 3, 3);
+							}
 						}
 						else
 						{

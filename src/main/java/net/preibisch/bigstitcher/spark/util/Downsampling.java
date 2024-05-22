@@ -7,6 +7,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.janelia.saalfeldlab.n5.Compression;
 import org.janelia.saalfeldlab.n5.DataType;
+import org.janelia.saalfeldlab.n5.GzipCompression;
 import org.janelia.saalfeldlab.n5.N5Writer;
 import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 
@@ -24,6 +25,8 @@ import net.preibisch.mvrecon.process.downsampling.lazy.LazyHalfPixelDownsample2x
 import net.preibisch.mvrecon.process.export.ExportN5API.StorageType;
 import net.preibisch.mvrecon.process.export.ExportTools;
 import util.Grid;
+
+import static net.preibisch.bigstitcher.spark.N5BlockValidateAndRetry.validateAndRetry;
 
 public class Downsampling
 {
@@ -120,6 +123,9 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
+								if (compression instanceof GzipCompression) {
+									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType(), blocksize, 3, 3);
+								}
 							}
 							else if ( datatype == DataType.UINT8 )
 							{
@@ -136,6 +142,9 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
+								if (compression instanceof GzipCompression) {
+									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType(), blocksize, 3, 3);
+								}
 							}
 							else if ( datatype == DataType.FLOAT32 )
 							{
@@ -177,6 +186,9 @@ public class Downsampling
 								final RandomAccessibleInterval<ShortType> sourceGridBlock =
 										Converters.convertRAI( Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]), (i,o)->o.set( i.getShort() ), new ShortType() );
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
+								if (compression instanceof GzipCompression) {
+									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType(), blocksize, 3, 3);
+								}
 							}
 							else
 							{
