@@ -147,9 +147,7 @@ public class SparkDownsample extends AbstractBasic implements Callable<Void>, Se
 						final RandomAccessibleInterval sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, n5DatasetOut, gridBlock[2], (RealType & NativeType)DataTypeUtil.toType( dataTypeLcl ));
 
-						if (compression instanceof GzipCompression) {
-							validateAndRetry(sourceGridBlock, n5Lcl, n5DatasetOut, gridBlock[2], (RealType & NativeType)DataTypeUtil.toType( dataTypeLcl ), blockSize, 3, 3);
-						}
+						validateAndRetry(sourceGridBlock, n5Lcl, n5DatasetOut, gridBlock[2], (RealType & NativeType)DataTypeUtil.toType( dataTypeLcl ), blockSize);
 					});
 
 			Thread.sleep( 100 );

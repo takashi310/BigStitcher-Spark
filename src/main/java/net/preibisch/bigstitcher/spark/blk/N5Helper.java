@@ -33,9 +33,7 @@ public class N5Helper
 			PrimitiveBlocks.of( source ).copy( source.minAsLongArray(), dataBlock.getData(), size );
 			n5.writeBlock( dataset, attributes, dataBlock );
 
-			if (attributes.getCompression() instanceof GzipCompression) {
-				validateAndRetry(source, n5, dataset, gridOffset, dataBlock, 10, 5);
-			}
+			validateAndRetry(source, n5, dataset, dataBlock);
 		}
 		else
 		{

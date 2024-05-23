@@ -15,26 +15,29 @@ import java.util.zip.GZIPInputStream;
 
 public class N5BlockValidateAndRetry {
 
-    public static boolean ValidateN5Block(String blockPath) {
-        boolean valid = true;
-        try (FileInputStream fis = new FileInputStream(blockPath)) {
-            // Skip the first 16 bytes
-            if (fis.skip(16) != 16) {
-                valid = false; // Unable to skip 16 bytes
-            } else {
-                try (GZIPInputStream gzis = new GZIPInputStream(fis)) {
-                    byte[] buffer = new byte[8192];
-                    while (gzis.read(buffer) != -1) {
-                        // Reading to validate the stream
-                    }
-                }
-                valid = true;
+    //TODO: Support other compression formats
+
+    public static final int RETRY_NUM = 10;
+    public static final int WAIT_TIME = 5;
+
+    public static boolean ValidateN5Block(final N5Writer n5,
+                                          final String dataset,
+                                          final long[] blockPosition) {
+        try {
+            // Read the specific block
+            DataBlock<?> block = n5.readBlock(dataset, n5.getDatasetAttributes(dataset), blockPosition);
+
+            // Validate the block
+            if (block == null) {
+                System.out.println("Block does not exist.");
+                return false;
             }
-        } catch (IOException e) {
-            valid = false;
+
+        } catch (Exception e) {
+            return false;
         }
 
-        return valid;
+        return true;
     }
     public static <T extends net.imglib2.type.NativeType<T>> void validateAndRetry(
             net.imglib2.RandomAccessibleInterval<T> source,
@@ -42,24 +45,20 @@ public class N5BlockValidateAndRetry {
             String dataset,
             long[] gridOffset,
             T defaultValue,
-            int[] blockSize,
-            int retry,
-            int wait) {
-
+            int[] blockSize) {
+        int retry = RETRY_NUM;
         final long[] gridPosition = new long[gridOffset.length];
         for (int d = 0; d < gridOffset.length; ++d)
             gridPosition[d] = gridOffset[d] / blockSize[d];
-        GsonKeyValueN5Writer n5w = (GsonKeyValueN5Writer) n5;
-        final String blockPath = n5w.absoluteDataBlockPath(N5URI.normalizeGroupPath(dataset), gridPosition);
-        boolean valid = true;
-        do {
-            valid = ValidateN5Block(blockPath);
+        boolean valid = false;
+        while(!valid && retry > 0) {
+            valid = ValidateN5Block(n5, dataset, gridPosition);
             if (!valid) {
-                System.err.println( "The n5 block is corrupted. retrying... " + retry);
+                System.err.println( "The n5 block is corrupted. retrying... " + (RETRY_NUM - retry + 1));
                 try {
-                    Thread.sleep(wait * 1000);
+                    Thread.sleep(WAIT_TIME * 1000);
                 } catch (InterruptedException e) {
-                    System.err.println( "could not sleep" );
+                    System.err.println( "validateAndRetry: failed to sleep" );
                 }
                 try {
                     N5Utils.saveNonEmptyBlock(source, n5, dataset, gridOffset, defaultValue);
@@ -68,29 +67,25 @@ public class N5BlockValidateAndRetry {
                 }
             }
             retry--;
-        } while(!valid && retry > 0);
+        }
     }
 
     public static <T extends net.imglib2.type.NativeType<T>> void validateAndRetry(
             final RandomAccessibleInterval< T > source,
             final N5Writer n5,
             final String dataset,
-            final long[] gridOffset,
-            DataBlock< ? > dataBlock,
-            int retry,
-            int wait) {
+            DataBlock< ? > dataBlock) {
+        int retry = RETRY_NUM;
         final DatasetAttributes attributes = n5.getDatasetAttributes( dataset );
-        GsonKeyValueN5Writer n5w = (GsonKeyValueN5Writer) n5;
-        final String blockPath = n5w.absoluteDataBlockPath(N5URI.normalizeGroupPath(dataset), dataBlock.getGridPosition());
-        boolean valid = true;
-        do {
-            valid = ValidateN5Block(blockPath);
+        boolean valid = false;
+        while(!valid && retry > 0) {
+            valid = ValidateN5Block(n5, dataset, dataBlock.getGridPosition());
             if (!valid) {
-                System.err.println( "The n5 block is corrupted. retrying... " + retry);
+                System.err.println( "The n5 block is corrupted. retrying... " + (RETRY_NUM - retry + 1));
                 try {
-                    Thread.sleep(wait * 1000);
+                    Thread.sleep(WAIT_TIME * 1000);
                 } catch (InterruptedException e) {
-                    System.err.println( "could not sleep" );
+                    System.err.println( "validateAndRetry: failed to sleep" );
                 }
                 try {
                     n5.writeBlock( dataset, attributes, dataBlock );
@@ -99,6 +94,6 @@ public class N5BlockValidateAndRetry {
                 }
             }
             retry--;
-        } while(!valid && retry > 0);
+        }
     }
 }

@@ -123,9 +123,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
-								if (compression instanceof GzipCompression) {
-									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType(), blocksize, 10, 5);
-								}
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType(), blocksize);
 							}
 							else if ( datatype == DataType.UINT8 )
 							{
@@ -142,9 +140,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
-								if (compression instanceof GzipCompression) {
-									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType(), blocksize, 10, 5);
-								}
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType(), blocksize);
 							}
 							else if ( datatype == DataType.FLOAT32 )
 							{
@@ -161,9 +157,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType());
-								if (compression instanceof GzipCompression) {
-									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType(), blocksize, 10, 5);
-								}
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType(), blocksize);
 							}
 							else if ( datatype == DataType.INT16 )
 							{
@@ -189,9 +183,7 @@ public class Downsampling
 								final RandomAccessibleInterval<ShortType> sourceGridBlock =
 										Converters.convertRAI( Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]), (i,o)->o.set( i.getShort() ), new ShortType() );
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
-								if (compression instanceof GzipCompression) {
-									validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType(), blocksize, 10, 5);
-								}
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType(), blocksize);
 							}
 							else
 							{
