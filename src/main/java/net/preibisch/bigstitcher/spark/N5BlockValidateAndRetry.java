@@ -55,7 +55,7 @@ public class N5BlockValidateAndRetry {
         do {
             valid = ValidateN5Block(blockPath);
             if (!valid) {
-                System.err.println( "created n5 block is corrupted. retrying... " + retry);
+                System.err.println( "The n5 block is corrupted. retrying... " + retry);
                 try {
                     Thread.sleep(wait * 1000);
                 } catch (InterruptedException e) {
@@ -86,7 +86,7 @@ public class N5BlockValidateAndRetry {
         do {
             valid = ValidateN5Block(blockPath);
             if (!valid) {
-                System.err.println( "created n5 block is corrupted. retrying..." );
+                System.err.println( "The n5 block is corrupted. retrying... " + retry);
                 try {
                     Thread.sleep(wait * 1000);
                 } catch (InterruptedException e) {

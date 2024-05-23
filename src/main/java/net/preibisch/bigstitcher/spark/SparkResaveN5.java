@@ -274,7 +274,7 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 						final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType());
 						if (compression instanceof GzipCompression) {
-							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType(), blockSize, 3, 3);
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedShortType(), blockSize, 10, 5);
 						}
 					}
 					else if ( dataType == DataType.UINT8 )
@@ -283,7 +283,7 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 						final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType());
 						if (compression instanceof GzipCompression) {
-							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType(), blockSize, 3, 3);
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new UnsignedByteType(), blockSize, 10, 5);
 						}
 					}
 					else if ( dataType == DataType.FLOAT32 )
@@ -292,7 +292,7 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 						final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(img, gridBlock[0], gridBlock[1]);
 						N5Utils.saveNonEmptyBlock(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType());
 						if (compression instanceof GzipCompression) {
-							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType(), blockSize, 3, 3);
+							validateAndRetry(sourceGridBlock, n5Lcl, dataset, gridBlock[2], new FloatType(), blockSize, 10, 5);
 						}
 					}
 					else

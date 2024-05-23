@@ -34,7 +34,7 @@ public class N5Helper
 			n5.writeBlock( dataset, attributes, dataBlock );
 
 			if (attributes.getCompression() instanceof GzipCompression) {
-				validateAndRetry(source, n5, dataset, gridOffset, dataBlock, 3, 3);
+				validateAndRetry(source, n5, dataset, gridOffset, dataBlock, 10, 5);
 			}
 		}
 		else
