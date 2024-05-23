@@ -48,6 +48,7 @@ public class N5BlockValidateAndRetry {
         final long[] gridPosition = new long[gridOffset.length];
         for (int d = 0; d < gridOffset.length; ++d)
             gridPosition[d] = gridOffset[d] / blockSize[d];
+        System.err.println( "offset "+ Arrays.toString(gridOffset) +" block_size " + Arrays.toString(blockSize));
         boolean valid = false;
         while(!valid && retry > 0) {
             valid = ValidateN5Block(n5, dataset, gridPosition);
