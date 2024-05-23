@@ -11,14 +11,12 @@ import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.zip.GZIPInputStream;
 
 public class N5BlockValidateAndRetry {
-
-    //TODO: Support other compression formats
-
-    public static final int RETRY_NUM = 10;
-    public static final int WAIT_TIME = 5;
+    public static int RETRY_NUM = 0;
+    public static int WAIT_TIME = 5;
 
     public static boolean ValidateN5Block(final N5Writer n5,
                                           final String dataset,
@@ -54,7 +52,7 @@ public class N5BlockValidateAndRetry {
         while(!valid && retry > 0) {
             valid = ValidateN5Block(n5, dataset, gridPosition);
             if (!valid) {
-                System.err.println( "The n5 block is corrupted. retrying... " + (RETRY_NUM - retry + 1));
+                System.err.println( "The n5 block "+ Arrays.toString(gridPosition) +" is corrupted. retrying... " + retry);
                 try {
                     Thread.sleep(WAIT_TIME * 1000);
                 } catch (InterruptedException e) {
@@ -81,7 +79,7 @@ public class N5BlockValidateAndRetry {
         while(!valid && retry > 0) {
             valid = ValidateN5Block(n5, dataset, dataBlock.getGridPosition());
             if (!valid) {
-                System.err.println( "The n5 block is corrupted. retrying... " + (RETRY_NUM - retry + 1));
+                System.err.println( "The n5 block "+ Arrays.toString(dataBlock.getGridPosition()) +" is corrupted. retrying... " + retry);
                 try {
                     Thread.sleep(WAIT_TIME * 1000);
                 } catch (InterruptedException e) {

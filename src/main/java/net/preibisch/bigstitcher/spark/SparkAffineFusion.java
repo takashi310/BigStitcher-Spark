@@ -106,6 +106,9 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 	@Option(names = "--maskOffset", description = "allows to make masks larger (+, the mask will include some background) or smaller (-, some fused content will be cut off), warning: in the non-isotropic coordinate space of the raw input images (default: 0.0,0.0,0.0)")
 	private String maskOffset = "0.0,0.0,0.0";
 
+	@Option(names = { "--retry" }, description = "detect corrupted blocks and resave data (default number of attempts: 0)")
+	private int retry = 0;
+
 	// TODO: support create custom downsampling pyramids, null is fine for now (used by multiRes later)
 	private int[][] downsamplings;
 
@@ -123,6 +126,8 @@ public class SparkAffineFusion extends AbstractSelectableViews implements Callab
 		FusionTools.defaultBlendingRange = 950;
 		if (oneTileWins)
 			Fusion.ONE_TILE_WINS = true;
+
+		N5BlockValidateAndRetry.RETRY_NUM = retry;
 
 		if (dryRun)
 		{

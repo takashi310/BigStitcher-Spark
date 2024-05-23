@@ -72,9 +72,14 @@ public class SparkResaveN5 extends AbstractBasic implements Callable<Void>, Seri
 	@Option(names = { "-o", "--n5Path" }, description = "N5 path for saving, (default: 'folder of the xml'/dataset.n5)")
 	private String n5Path = null;
 
+	@Option(names = { "--retry" }, description = "detect corrupted blocks and resave data (default number of attempts: 0)")
+	private int retry = 0;
+
 	@Override
 	public Void call() throws Exception
 	{
+		N5BlockValidateAndRetry.RETRY_NUM = retry;
+
 		final SpimData2 dataGlobal = this.loadSpimData2();
 
 		if ( dataGlobal == null )

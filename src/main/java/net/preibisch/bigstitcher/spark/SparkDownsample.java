@@ -50,9 +50,14 @@ public class SparkDownsample extends AbstractBasic implements Callable<Void>, Se
 	@Option(names = { "-ds", "--downsampling" }, split = ";", required = true, description = "consecutive downsample steps (e.g. 2,2,1; 2,2,1; 2,2,2; 2,2,2)")
 	private List<String> downsampling = null;
 
+	@Option(names = { "--retry" }, description = "detect corrupted blocks and resave data (default number of attempts: 0)")
+	private int retry = 0;
+
 	@Override
 	public Void call() throws Exception
 	{
+		N5BlockValidateAndRetry.RETRY_NUM = retry;
+
 		if (dryRun)
 		{
 			System.out.println( "dry-run not supported for downsampling.");
