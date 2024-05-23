@@ -123,7 +123,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType(), blocksize);
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
 							}
 							else if ( datatype == DataType.UINT8 )
 							{
@@ -140,7 +140,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType(), blocksize);
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
 							}
 							else if ( datatype == DataType.FLOAT32 )
 							{
@@ -157,7 +157,7 @@ public class Downsampling
 
 								final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType(), blocksize);
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType());
 							}
 							else if ( datatype == DataType.INT16 )
 							{
@@ -183,7 +183,7 @@ public class Downsampling
 								final RandomAccessibleInterval<ShortType> sourceGridBlock =
 										Converters.convertRAI( Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]), (i,o)->o.set( i.getShort() ), new ShortType() );
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType(), blocksize);
+								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
 							}
 							else
 							{

@@ -42,18 +42,14 @@ public class N5BlockValidateAndRetry {
             org.janelia.saalfeldlab.n5.N5Writer n5,
             String dataset,
             long[] gridOffset,
-            T defaultValue,
-            int[] blockSize) {
+            T defaultValue) {
         int retry = RETRY_NUM;
-        final long[] gridPosition = new long[gridOffset.length];
-        for (int d = 0; d < gridOffset.length; ++d)
-            gridPosition[d] = gridOffset[d] / blockSize[d];
-        System.err.println( "offset "+ Arrays.toString(gridOffset) +" block_size " + Arrays.toString(blockSize));
         boolean valid = false;
         while(!valid && retry > 0) {
-            valid = ValidateN5Block(n5, dataset, gridPosition);
+            System.out.println( "validating block "+ Arrays.toString(gridOffset));
+            valid = ValidateN5Block(n5, dataset, gridOffset);
             if (!valid) {
-                System.err.println( "The n5 block "+ Arrays.toString(gridPosition) +" is corrupted. retrying... " + retry);
+                System.err.println( "The n5 block "+ Arrays.toString(gridOffset) +" is corrupted. retrying... " + retry);
                 try {
                     Thread.sleep(WAIT_TIME * 1000);
                 } catch (InterruptedException e) {
@@ -78,6 +74,7 @@ public class N5BlockValidateAndRetry {
         final DatasetAttributes attributes = n5.getDatasetAttributes( dataset );
         boolean valid = false;
         while(!valid && retry > 0) {
+            System.out.println( "validating block "+ Arrays.toString(dataBlock.getGridPosition()));
             valid = ValidateN5Block(n5, dataset, dataBlock.getGridPosition());
             if (!valid) {
                 System.err.println( "The n5 block "+ Arrays.toString(dataBlock.getGridPosition()) +" is corrupted. retrying... " + retry);
