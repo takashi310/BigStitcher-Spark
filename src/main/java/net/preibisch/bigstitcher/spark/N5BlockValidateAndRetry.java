@@ -19,9 +19,39 @@ public class N5BlockValidateAndRetry {
     public static int RETRY_NUM = 0;
     public static int WAIT_TIME = 5;
 
+    public static boolean ValidateN5BlockGZIP(final N5Writer n5,
+                                              final String dataset,
+                                              final long[] blockPosition) {
+
+        GsonKeyValueN5Writer n5w = (GsonKeyValueN5Writer) n5;
+        final String blockPath = n5w.absoluteDataBlockPath(N5URI.normalizeGroupPath(dataset), blockPosition);
+        try (FileInputStream fis = new FileInputStream(blockPath)) {
+            // Skip the first 16 bytes
+            if (fis.skip(16) != 16) {
+                return false; // Unable to skip 16 bytes
+            } else {
+                try (GZIPInputStream gzis = new GZIPInputStream(fis)) {
+                    byte[] buffer = new byte[8192];
+                    while (gzis.read(buffer) != -1) {
+                        // Reading to validate the stream
+                    }
+                }
+            }
+        } catch (IOException e) {
+            return false;
+        }
+
+        return true;
+    }
+
     public static boolean ValidateN5Block(final N5Writer n5,
                                           final String dataset,
                                           final long[] blockPosition) {
+
+        final DatasetAttributes attributes = n5.getDatasetAttributes(dataset);
+        if (attributes.getCompression() instanceof GzipCompression)
+            return ValidateN5BlockGZIP(n5, dataset, blockPosition);
+
         try {
             // Read the specific block
             DataBlock<?> block = n5.readBlock(dataset, n5.getDatasetAttributes(dataset), blockPosition);
