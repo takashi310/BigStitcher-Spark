@@ -29,7 +29,6 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.janelia.saalfeldlab.n5.Compression;
 import org.janelia.saalfeldlab.n5.DataType;
-import org.janelia.saalfeldlab.n5.GzipCompression;
 import org.janelia.saalfeldlab.n5.N5Writer;
 import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 import org.janelia.saalfeldlab.n5.universe.N5Factory.StorageFormat;
@@ -47,8 +46,6 @@ import net.preibisch.bigstitcher.spark.SparkAffineFusion;
 import net.preibisch.mvrecon.process.downsampling.lazy.LazyHalfPixelDownsample2x;
 import net.preibisch.mvrecon.process.n5api.N5ApiTools;
 import util.Grid;
-
-import static net.preibisch.bigstitcher.spark.N5BlockValidateAndRetry.validateAndRetry;
 
 public class Downsampling
 {
@@ -138,15 +135,14 @@ public class Downsampling
 								for ( int d = 0; d < downsampled.numDimensions(); ++d )
 									if ( ds[ d ] > 1 )
 										downsampled = LazyHalfPixelDownsample2x.init(
-											downsampled,
-											new FinalInterval( downsampled ),
-											new UnsignedShortType(),
-											blocksize,
-											d);
+												downsampled,
+												new FinalInterval( downsampled ),
+												new UnsignedShortType(),
+												blocksize,
+												d);
 
 								final RandomAccessibleInterval<UnsignedShortType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedShortType());
 							}
 							else if ( datatype == DataType.UINT8 )
 							{
@@ -155,15 +151,14 @@ public class Downsampling
 								for ( int d = 0; d < downsampled.numDimensions(); ++d )
 									if ( ds[ d ] > 1 )
 										downsampled = LazyHalfPixelDownsample2x.init(
-											downsampled,
-											new FinalInterval( downsampled ),
-											new UnsignedByteType(),
-											blocksize,
-											d);
+												downsampled,
+												new FinalInterval( downsampled ),
+												new UnsignedByteType(),
+												blocksize,
+												d);
 
 								final RandomAccessibleInterval<UnsignedByteType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new UnsignedByteType());
 							}
 							else if ( datatype == DataType.FLOAT32 )
 							{
@@ -172,15 +167,14 @@ public class Downsampling
 								for ( int d = 0; d < downsampled.numDimensions(); ++d )
 									if ( ds[ d ] > 1 )
 										downsampled = LazyHalfPixelDownsample2x.init(
-											downsampled,
-											new FinalInterval( downsampled ),
-											new FloatType(),
-											blocksize,
-											d);
+												downsampled,
+												new FinalInterval( downsampled ),
+												new FloatType(),
+												blocksize,
+												d);
 
 								final RandomAccessibleInterval<FloatType> sourceGridBlock = Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]);
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new FloatType());
 							}
 							else if ( datatype == DataType.INT16 )
 							{
@@ -197,16 +191,15 @@ public class Downsampling
 								for ( int d = 0; d < downsampled.numDimensions(); ++d )
 									if ( ds[ d ] > 1 )
 										downsampled = LazyHalfPixelDownsample2x.init(
-											downsampled,
-											new FinalInterval( downsampled ),
-											new UnsignedShortType(),
-											blocksize,
-											d);
+												downsampled,
+												new FinalInterval( downsampled ),
+												new UnsignedShortType(),
+												blocksize,
+												d);
 
 								final RandomAccessibleInterval<ShortType> sourceGridBlock =
 										Converters.convertRAI( Views.offsetInterval(downsampled, gridBlock[0], gridBlock[1]), (i,o)->o.set( i.getShort() ), new ShortType() );
 								N5Utils.saveNonEmptyBlock(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
-								validateAndRetry(sourceGridBlock, executorVolumeWriter, datasetDownsampling, gridBlock[2], new ShortType());
 							}
 							else
 							{
@@ -214,7 +207,7 @@ public class Downsampling
 								throw new RuntimeException("Unsupported pixel type: " + datatype );
 							}
 						}
-						catch (Exception exc) 
+						catch (Exception exc)
 						{
 							System.out.println( "Error writing block offset=" + Util.printCoordinates( gridBlock[0] ) + "' ... " + exc );
 							exc.printStackTrace();
