@@ -1,3 +1,24 @@
+/*-
+ * #%L
+ * Spark-based parallel BigStitcher project.
+ * %%
+ * Copyright (C) 2021 - 2024 Developers.
+ * %%
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, either version 2 of the
+ * License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/gpl-2.0.html>.
+ * #L%
+ */
 package net.preibisch.bigstitcher.spark.util;
 
 import java.util.ArrayList;
@@ -8,10 +29,10 @@ import java.util.List;
 import mpicbg.spim.data.SpimData;
 import mpicbg.spim.data.sequence.ViewDescription;
 import mpicbg.spim.data.sequence.ViewId;
+import net.preibisch.bigstitcher.spark.SparkAffineFusion.DataTypeFusion;
 import net.preibisch.mvrecon.fiji.spimdata.SpimData2;
 import net.preibisch.mvrecon.fiji.spimdata.boundingbox.BoundingBox;
 import net.preibisch.mvrecon.process.boundingbox.BoundingBoxTools;
-import net.preibisch.mvrecon.process.export.ExportN5API.StorageType;
 
 public class Import {
 
@@ -45,17 +66,12 @@ public class Import {
 	}
 
 	public static void validateInputParameters(
-			final boolean uint8,
-			final boolean uint16,
+			final DataTypeFusion datatype,
 			final Double minIntensity,
 			final Double maxIntensity )
 			throws IllegalArgumentException
 	{
-		if ( uint8 && uint16 ) {
-			throw new IllegalArgumentException( "Please only select UINT8, UINT16 or nothing (FLOAT32)." );
-		}
-
-		if ( ( uint8 || uint16 ) && (minIntensity == null || maxIntensity == null ) ) {
+		if ( ( datatype == DataTypeFusion.UINT8 || datatype == DataTypeFusion.UINT16 ) && (minIntensity == null || maxIntensity == null ) ) {
 			throw new IllegalArgumentException( "When selecting UINT8 or UINT16 you need to specify minIntensity and maxIntensity." );
 		}
 	}
@@ -242,11 +258,30 @@ public class Import {
 	 * @param csvString
 	 * @return
 	 */
-	public static int[][] csvStringListToDownsampling(final List<String> csvString) {
-
+	public static int[][] csvStringListToDownsampling(final List<String> csvString)
+	{
+		if ( csvString == null || csvString.size() < 1 )
+		{
+			System.out.println( "List of strings for downsampling is empty/null.");
+			return null;
+		}
+		
 		final int[][] downsampling = new int[csvString.size()][];
 		for ( int i = 0; i < csvString.size(); ++i )
+		{
 			downsampling[ i ] = Arrays.stream(csvString.get( i ).split(",")).map( st -> st.trim() ).mapToInt(Integer::parseInt).toArray();
+			if ( downsampling[ i ].length != 3 )
+			{
+				System.out.println( "dimensions of downsampling entry is not 3: " + csvString.get( i ) );
+				return null;
+			}
+		}
+
+		if ( !Arrays.equals( downsampling[ 0 ], new int[] { 1, 1, 1 }))
+		{
+			System.out.println( "first entry is not [1,1,1], but must be: " + csvString.get( 0 ) );
+			return null;
+		}
 
 		return downsampling;
 	}
@@ -274,17 +309,18 @@ public class Import {
 		return new ViewId(timepointId, viewSetupId);
 	}
 
-	public static String createBDVPath(final String bdvString, final StorageType storageType)
+	/*
+	public static String createBDVPath(final String bdvString, final StorageFormat storageType)
 	{
 		final ViewId viewId = getViewId(bdvString);
 
 		String path = null;
 
-		if ( StorageType.N5.equals(storageType) )
+		if ( StorageFormat.N5.equals(storageType) )
 		{
 			path = "setup" + viewId.getViewSetupId() + "/" + "timepoint" + viewId.getTimePointId() + "/s0";
 		}
-		else if ( StorageType.HDF5.equals(storageType) )
+		else if ( StorageFormat.HDF5.equals(storageType) )
 		{
 			path = "t" + String.format("%05d", viewId.getTimePointId()) + "/" + "s" + String.format("%02d", viewId.getViewSetupId()) + "/0/cells";
 		}
@@ -297,5 +333,5 @@ public class Import {
 		System.out.println( "path=" + path );
 
 		return path;
-	}
+	}*/
 }

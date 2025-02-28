@@ -1,4 +1,4 @@
-package net.preibisch.bigstitcher.spark;
+package org.janelia.saalfeldlab.n5.imglib2;
 
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.util.Intervals;
@@ -9,6 +9,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.zip.GZIPInputStream;
+
+import com.github.luben.zstd.ZstdInputStream;
+
+import org.janelia.saalfeldlab.n5.Bzip2Compression;
+import org.janelia.saalfeldlab.n5.blosc.BloscCompression;
+import org.janelia.scicomp.n5.zstandard.ZstandardCompression;
 
 public class N5BlockValidateAndRetry {
     public static int RETRY_NUM = 0;
@@ -30,6 +36,35 @@ public class N5BlockValidateAndRetry {
                     while (gzis.read(buffer) != -1) {
                         // Reading to validate the stream
                     }
+                } catch (IOException e) {
+                    return false;
+                }
+            }
+        } catch (IOException e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static boolean ValidateN5BlockZSTD(final N5Writer n5,
+                                               final String dataset,
+                                               final long[] blockPosition) {
+
+        GsonKeyValueN5Writer n5w = (GsonKeyValueN5Writer) n5;
+        final String blockPath = n5w.absoluteDataBlockPath(N5URI.normalizeGroupPath(dataset), blockPosition);
+        try (FileInputStream fis = new FileInputStream(blockPath)) {
+            // Skip the first 16 bytes
+            if (fis.skip(16) != 16) {
+                return false; // Unable to skip 16 bytes
+            } else {
+                try (ZstdInputStream zstd_is = new ZstdInputStream(fis)) {
+                    byte[] buffer = new byte[8192];
+                    while (zstd_is.read(buffer) != -1) {
+                        // Reading to validate the stream
+                    }
+                } catch (IOException e) {
+                    return false;
                 }
             }
         } catch (IOException e) {
@@ -46,6 +81,8 @@ public class N5BlockValidateAndRetry {
         final DatasetAttributes attributes = n5.getDatasetAttributes(dataset);
         if (attributes.getCompression() instanceof GzipCompression)
             return ValidateN5BlockGZIP(n5, dataset, blockPosition);
+        if (attributes.getCompression() instanceof ZstandardCompression)
+            return ValidateN5BlockZSTD(n5, dataset, blockPosition);
 
         try {
             // Read the specific block

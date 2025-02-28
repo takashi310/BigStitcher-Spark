@@ -1,8 +1,31 @@
+/*-
+ * #%L
+ * Spark-based parallel BigStitcher project.
+ * %%
+ * Copyright (C) 2021 - 2024 Developers.
+ * %%
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, either version 2 of the
+ * License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/gpl-2.0.html>.
+ * #L%
+ */
 package net.preibisch.bigstitcher.spark.util;
 
 import java.io.Serializable;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.spark.SparkEnv;
 import org.slf4j.Logger;
@@ -202,25 +225,66 @@ public class Spark {
 	/**
 	 * @return a new data instance optimized for use within single-threaded Spark tasks.
 	 */
-	public static SpimData2 getSparkJobSpimData2(final String clusterExt,
-												 final String xmlPath)
-			throws SpimDataException {
+	public static SpimData2 getSparkJobSpimData2( final URI xmlPath ) throws SpimDataException
+	{
+		return getJobSpimData2( xmlPath, 0 );
+	}
 
-		final SpimData2 data = new XmlIoSpimData2(clusterExt).load(xmlPath);
+	/**
+	 * @return a new data instance optimized for multi-threaded tasks.
+	 */
+	public static SpimData2 getJobSpimData2( final URI xmlPath, final int numFetcherThreads ) throws SpimDataException
+	{
+		final SpimData2 data = new XmlIoSpimData2().load(xmlPath);
 		final SequenceDescription sequenceDescription = data.getSequenceDescription();
 
 		// set number of fetcher threads to 0 for spark usage
 		final BasicImgLoader imgLoader = sequenceDescription.getImgLoader();
 		if (imgLoader instanceof ViewerImgLoader) {
-			((ViewerImgLoader) imgLoader).setNumFetcherThreads(0);
+			((ViewerImgLoader) imgLoader).setNumFetcherThreads( numFetcherThreads );
 		}
 
-		LOG.info("getSparkJobSpimData2: loaded {} for clusterExt={}, xmlPath={} on executorId={}",
-				 data, clusterExt, xmlPath, getSparkExecutorId());
+		//LOG.info("getSparkJobSpimData2: loaded {}, xmlPath={} on executorId={}", data, xmlPath, getSparkExecutorId());
 
 		return data;
 	}
 
 	private static final Logger LOG = LoggerFactory.getLogger(Spark.class);
 
+	public static ArrayList< Pair<ViewId, ViewId> > toViewIds( final List<Pair<ViewId, ViewId>> pairList )
+	{
+		final ArrayList< Pair<ViewId, ViewId> > serializableList = new ArrayList<>();
+
+		pairList.forEach( pair -> serializableList.add(
+				new ValuePair<>(
+						new ViewId(
+								pair.getA().getTimePointId(),
+								pair.getA().getViewSetupId()),
+						new ViewId(
+								pair.getB().getTimePointId(),
+								pair.getB().getViewSetupId())
+						)));
+
+		return serializableList;
+	}
+
+	public static ArrayList< Pair<Group<ViewId>, Group<ViewId>> > toGroupViewIds( final List<Pair<Group<ViewId>, Group<ViewId>>> pairList )
+	{
+		final ArrayList< Pair<Group<ViewId>, Group<ViewId>> > serializableList = new ArrayList<>();
+
+		pairList.forEach( pair -> serializableList.add(
+				new ValuePair<>(
+						toGroupViewIds( pair.getA() ),
+						toGroupViewIds( pair.getB() ) )));
+
+		return serializableList;
+	}
+
+	public static Group<ViewId> toGroupViewIds( final Group<ViewId> group )
+	{
+		return new Group<>(
+				group.getViews().stream().map( viewId -> new ViewId(
+						viewId.getTimePointId(),
+						viewId.getViewSetupId()) ).collect( Collectors.toList() ) );
+	}
 }

@@ -1,30 +1,31 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>BigStitcher-Spark</artifactId>
-    <version>0.0.2-SNAPSHOT</version>
 
     <parent>
         <groupId>org.scijava</groupId>
         <artifactId>pom-scijava</artifactId>
-        <version>36.0.0</version>
+        <version>39.0.0</version>
         <relativePath/>
     </parent>
 
+    <groupId>net.preibisch</groupId>
+    <artifactId>BigStitcher-Spark</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
     <name>BigStitcher Spark</name>
     <description>Spark-based parallel BigStitcher project.</description>
-    <url>https://</url>
+    <url>https://github.com/JaneliaSciComp/BigStitcher-Spark</url>
     <inceptionYear>2021</inceptionYear>
     <organization>
         <name>Fiji</name>
-        <url>http://fiji.sc/</url>
+        <url>https://fiji.sc/</url>
     </organization>
-
     <licenses>
         <license>
             <name>GNU General Public License v2+</name>
-            <url>http://www.gnu.org/licenses/gpl.html</url>
+            <url>https://www.gnu.org/licenses/gpl.html</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -47,39 +48,66 @@
     </developers>
 
     <contributors>
-        <contributor>
-            <name>Marwan Zouinkhi</name>
-            <url>https://</url>
-        </contributor>
+		<contributor>
+			<name>Marwan Zouinkhi</name>
+		</contributor>
+		<contributor>
+			<name>Tobias Pietzsch</name>
+			<url>https://imagej.net/people/tpietzsch</url>
+		</contributor>
     </contributors>
 
     <mailingLists>
         <mailingList>
             <name>ImageJ Forum</name>
-            <archive>http://forum.imagej.net/</archive>
+            <archive>https://forum.image.sc/</archive>
         </mailingList>
     </mailingLists>
 
     <scm>
-        <connection>scm:git:https://github.com/PreibischLab/BigStitcher-Spark</connection>
-        <developerConnection>scm:git:git@github.com:PreibischLab/BigStitcher-Spark</developerConnection>
+        <connection>scm:git:https://github.com/JaneliaSciComp/BigStitcher-Spark</connection>
+        <developerConnection>scm:git:git@github.com:JaneliaSciComp/BigStitcher-Spark</developerConnection>
         <tag>HEAD</tag>
-        <url>https://github.com/PreibischLab/BigStitcher-Spark</url>
+        <url>https://github.com/JaneliaSciComp/BigStitcher-Spark</url>
     </scm>
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>https://github.com/PreibischLab/BigStitcher-Spark/issues</url>
+        <url>https://github.com/JaneliaSciComp/BigStitcher-Spark/issues</url>
     </issueManagement>
     <ciManagement>
         <system>GitHub Actions</system>
-        <url>https://github.com/PreibischLab/BigStitcher-Spark/actions</url>
+        <url>https://github.com/JaneliaSciComp/BigStitcher-Spark/actions</url>
     </ciManagement>
 
     <properties>
+		<package-name>net.preibisch.bigstitcher.spark</package-name>
+
         <!-- <scijava.jvm.version>1.8</scijava.jvm.version> -->
-        <license.licenseName>gpl_v2</license.licenseName>
+        <license.licenseName>bsd</license.licenseName>
         <license.copyrightOwners>Developers.</license.copyrightOwners>
+
+		<!--
+		<imglib2.version>7.1.2</imglib2.version>
+		<imglib2-realtransform.version>4.0.3</imglib2-realtransform.version>
+		<imglib2-cache.version>1.0.0-beta-19</imglib2-cache.version>
+		<imglib2-algorithm.version>0.16.0</imglib2-algorithm.version>
+		<imglib2-roi.version>0.15.1</imglib2-roi.version>
+		<n5-imglib2.version>7.0.2</n5-imglib2.version>
+		<bigdataviewer-core.version>10.6.1</bigdataviewer-core.version>
+		<bigdataviewer-vistools.version>1.0.0-beta-36</bigdataviewer-vistools.version>
+		-->
+		<!-- <n5-zarr.version>1.3.5</n5-zarr.version> -->
+
+		<bigdataviewer-core.version>10.6.3</bigdataviewer-core.version>
+		<spim_data.version>2.3.5</spim_data.version>
+		<multiview-reconstruction.version>5.2.1</multiview-reconstruction.version>
+		<BigStitcher.version>2.3.4</BigStitcher.version>
+
+		<!--for the old bioformats to work properly (compared with old main branch to find out)-->
+		<ome-codecs.version>0.3.0</ome-codecs.version>
+
     </properties>
+
     <repositories>
         <!-- NB: for project parent -->
         <repository>
@@ -95,56 +123,65 @@
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>bigdataviewer-core</artifactId>
-            <version>10.4.6</version>
+            <!-- <version>10.4.6</version> -->
         </dependency>
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>bigdataviewer-vistools</artifactId>
-            <version>1.0.0-beta-32</version>
+            <!-- <version>1.0.0-beta-32</version> -->
         </dependency>
         <dependency>
             <groupId>net.imglib2</groupId>
             <artifactId>imglib2-cache</artifactId>
-            <version>1.0.0-beta-17</version>
+            <!-- <version>1.0.0-beta-17</version> -->
         </dependency>
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2</artifactId>
-			<version>6.3.0</version>
+			<!-- <version>6.3.0</version> -->
 		</dependency>
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-algorithm</artifactId>
-			<version>0.15.0</version>
+			<!-- <version>0.15.0</version> -->
+		</dependency>
+		<dependency>
+			<groupId>org.bigdataviewer</groupId>
+			<artifactId>bigdataviewer-n5</artifactId>
+			<version>1.0.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.annotation</groupId>
+                    <artifactId>javax.annotation-api</artifactId>
+                </exclusion>
+            </exclusions>
 		</dependency>
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>spim_data</artifactId>
         </dependency>
-        <dependency>
+        <!-- <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-s3</artifactId>
             <version>${aws-java-sdk-s3.version}</version>
-        </dependency>
-        <dependency>
+        </dependency> -->
+        <!-- <dependency>
             <groupId>org.bigdataviewer</groupId>
             <artifactId>bigdataviewer-omezarr</artifactId>
             <version>0.2.3</version>
-        </dependency>
+        </dependency> -->
         <dependency>
             <groupId>org.janelia.saalfeldlab</groupId>
             <artifactId>n5</artifactId>
-            <version>3.1.3</version>
         </dependency>
         <dependency>
             <groupId>org.janelia.saalfeldlab</groupId>
             <artifactId>n5-zarr</artifactId>
-            <version>1.2.1</version>
         </dependency>
         <dependency>
             <groupId>org.janelia.saalfeldlab</groupId>
             <artifactId>n5-aws-s3</artifactId>
-            <version>4.0.0</version>
+            <!-- <version>4.0.0</version> -->
         </dependency>
 <!--        Scala is sensitive to fasterxml version -->
         <dependency>
@@ -221,7 +258,6 @@
         <dependency>
             <groupId>net.preibisch</groupId>
             <artifactId>multiview-reconstruction</artifactId>
-            <version>3.2.12</version>
             <exclusions>
                 <exclusion>
                     <groupId>ch.epfl.biop</groupId>
@@ -242,6 +278,10 @@
                 <exclusion>
                     <groupId>ome</groupId>
                     <artifactId>formats-gpl</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.janelia.saalfeldlab</groupId>
+                    <artifactId>n5-imglib2</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -262,12 +302,11 @@
         <dependency>
             <groupId>org.janelia.saalfeldlab</groupId>
             <artifactId>n5-hdf5</artifactId>
-            <version>2.0.0</version>
+            <!-- <version>2.0.0</version> -->
         </dependency>
         <dependency>
             <groupId>org.janelia.saalfeldlab</groupId>
             <artifactId>n5-imglib2</artifactId>
-            <version>5.0.0</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/net.java.dev.jna/jna needed for M1 native library loading -->
         <dependency>
@@ -278,7 +317,6 @@
         <dependency>
             <groupId>net.preibisch</groupId>
             <artifactId>BigStitcher</artifactId>
-            <version>1.2.11</version>
             <exclusions>
                 <exclusion>
                     <groupId>ch.epfl.biop</groupId>
@@ -302,22 +340,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
         <!-- old bioformats -->
         <dependency>
             <groupId>org.openmicroscopy</groupId>
             <artifactId>ome-common</artifactId>
             <version>6.0.4</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.esotericsoftware.kryo</groupId>
-                    <artifactId>kryo</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>ome</groupId>
-            <artifactId>formats-bsd</artifactId>
-            <version>6.5.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.esotericsoftware.kryo</groupId>
@@ -352,8 +380,12 @@
             </exclusions>
         </dependency>
 
+        <dependency>
+            <groupId>com.github.luben</groupId>
+            <artifactId>zstd-jni</artifactId>
+            <version>1.5.5-7</version>
+        </dependency>
     </dependencies>
-    <groupId>net.preibisch</groupId>
 
     <profiles>
         <profile>
