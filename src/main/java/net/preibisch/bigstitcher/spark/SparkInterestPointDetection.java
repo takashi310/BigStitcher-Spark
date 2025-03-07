@@ -533,9 +533,9 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 			final ViewId viewId = Spark.deserializeViewId( tuple._1() );
 			final double[][] points = tuple._3();
 
+			interestPointsPerViewId.putIfAbsent(viewId, new ArrayList<>() );
 			if ( points != null && points.length > 0 )
 			{
-				interestPointsPerViewId.putIfAbsent(viewId, new ArrayList<>() );
 				interestPointsPerViewId.get( viewId ).add( Spark.deserializeInterestPoints(points) );
 
 				intervalsPerViewId.putIfAbsent(viewId, new ArrayList<>() );
@@ -559,6 +559,9 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 			for ( final ViewId viewId : viewIds )
 			{
 				final List< List< InterestPoint > > ipsList = interestPointsPerViewId.get( viewId );
+				if (ipsList.size() == 0)
+					continue;
+
 				final List< List< Double > > intensitiesList = intensitiesPerViewId.get( viewId );
 				final List< Interval > intervalsList = intervalsPerViewId.get( viewId ); // note: in downsampled coordinates(!)
 
@@ -628,6 +631,12 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 
 			final List< List< InterestPoint > > ipsList = interestPointsPerViewId.get( viewId );
 			final List< List< Double > > intensitiesList;
+
+			if (ipsList.size() == 0) {
+				final ArrayList< InterestPoint > myIpsNewId = new ArrayList<>();
+				interestPoints.put(viewId, myIpsNewId);
+				continue;
+			}
 
 			if ( storeIntensities || maxSpots > 0 )
 				intensitiesList = intensitiesPerViewId.get( viewId );
@@ -716,6 +725,8 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 			else
 			{
 				System.out.println( Group.pvid( viewId ) + ": no points found." );
+				final ArrayList< InterestPoint > myIpsNewId = new ArrayList<>();
+				interestPoints.put(viewId, myIpsNewId);
 			}
 		}
 
