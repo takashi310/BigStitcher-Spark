@@ -52,7 +52,7 @@ import net.imglib2.util.Util;
 import net.imglib2.util.ValuePair;
 import net.preibisch.bigstitcher.spark.abstractcmdline.AbstractSelectableViews;
 import net.preibisch.bigstitcher.spark.util.Spark;
-import net.preibisch.bigstitcher.spark.util.Spark.SerializablePairwiseStitchingResult;
+import net.preibisch.bigstitcher.spark.util.SerializablePairwiseStitchingResult;
 import net.preibisch.mvrecon.fiji.spimdata.SpimData2;
 import net.preibisch.mvrecon.fiji.spimdata.XmlIoSpimData2;
 import net.preibisch.mvrecon.fiji.spimdata.stitchingresults.PairwiseStitchingResult;
@@ -191,7 +191,7 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 
 		final JavaRDD<int[][][]> rdd = sc.parallelize( Spark.serializeGroupedViewIdPairsForRDD( groupedPairs ), Math.min( Spark.maxPartitions, groupedPairs.size() ) );
 
-		final JavaRDD<Tuple2<int[][][], Spark.SerializablePairwiseStitchingResult>> rddResults = rdd.map( serializedGroupPair ->
+		final JavaRDD<Tuple2<int[][][], SerializablePairwiseStitchingResult>> rddResults = rdd.map( serializedGroupPair ->
 		{
 			final SpimData2 data = Spark.getSparkJobSpimData2( xmlURI );
 			final Pair<Group<ViewId>, Group<ViewId>> pair = Spark.deserializeGroupedViewIdPairForRDD( serializedGroupPair );
@@ -298,7 +298,7 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 								result.getA().getB(),
 								oldTransformHash );
 
-				return new Tuple2<>( serializedGroupPair, new Spark.SerializablePairwiseStitchingResult( pairwiseStitchingResult ) );
+				return new Tuple2<>( serializedGroupPair, new SerializablePairwiseStitchingResult( pairwiseStitchingResult ) );
 			}
 		});
 
