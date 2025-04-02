@@ -42,6 +42,7 @@ import mpicbg.spim.data.sequence.Channel;
 import mpicbg.spim.data.sequence.Illumination;
 import mpicbg.spim.data.sequence.Tile;
 import mpicbg.spim.data.sequence.TimePoint;
+import mpicbg.spim.data.sequence.ViewDescription;
 import mpicbg.spim.data.sequence.ViewId;
 import net.imglib2.RealInterval;
 import net.imglib2.realtransform.AffineGet;
@@ -120,6 +121,17 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 		if ( viewIdsGlobal == null || viewIdsGlobal.size() == 0 )
 			return null;
 
+		System.out.println( "\nDebugging ViewDescriptions ... " );
+		for ( final ViewId v : viewIdsGlobal )
+		{
+			System.out.println( "ViewId=" + Group.pvid( v ) );
+			ViewDescription vd = dataGlobal.getSequenceDescription().getViewDescription( v );
+			System.out.println( "ViewDescription=" + Group.pvid( vd ) );
+			System.out.println( "ViewSetup=" + vd.getViewSetup() );
+			System.out.println( "ViewSetup.getAttributes()=" + vd.getViewSetup().getAttributes() );
+			System.out.println( "ViewSetup.getAttributes().size()=" + vd.getViewSetup().getAttributes().size() );
+		}
+
 		final long[] ds = Arrays.stream(downsampling.split(",")).map( st -> st.trim() ).mapToLong(Long::parseLong).toArray();
 
 		System.out.println( "(" + new Date( System.currentTimeMillis() ) + "): Downsampling used for stitching: " + Util.printCoordinates( ds ) );
@@ -157,6 +169,12 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 		groupedPairs.forEach( pair -> System.out.println( "\t" + pair.getA() + " <=> " + pair.getB() ) );
 		System.out.println( "(" + new Date( System.currentTimeMillis() ) + "): In total: " + groupedPairs.size() + " pair(s).");
 
+		if ( groupedPairs.size() == 0 )
+		{
+			System.out.println( "no pairs to compare, stopping.");
+			return null;
+		}
+
 		// setup parameters
 		final boolean doSubpixel = !disableSubpixelResolution;
 		final int numPeaks = this.peaksToCheck;
@@ -164,10 +182,14 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 		final ActionType illumCombine = this.illumCombine;
 
 		final SparkConf conf = new SparkConf().setAppName("SparkPairwiseStitching");
+
+		if (localSparkBindAddress)
+			conf.set("spark.driver.bindAddress", "127.0.0.1");
+
 		final JavaSparkContext sc = new JavaSparkContext(conf);
 		sc.setLogLevel("ERROR");
 
-		final JavaRDD<int[][][]> rdd = sc.parallelize( Spark.serializeGroupedViewIdPairsForRDD( groupedPairs ) );
+		final JavaRDD<int[][][]> rdd = sc.parallelize( Spark.serializeGroupedViewIdPairsForRDD( groupedPairs ), Math.min( Spark.maxPartitions, groupedPairs.size() ) );
 
 		final JavaRDD<Tuple2<int[][][], Spark.SerializablePairwiseStitchingResult>> rddResults = rdd.map( serializedGroupPair ->
 		{
@@ -194,6 +216,29 @@ public class SparkPairwiseStitching extends AbstractSelectableViews
 			boolean nonTranslationsEqual = TransformTools.nonTranslationsEqual( vrs.getViewRegistration( firstVdA ), vrs.getViewRegistration( firstVdB ) );
 
 			final Pair<Pair< AffineGet, Double >, RealInterval> result;
+
+			// debug code for https://github.com/JaneliaSciComp/BigStitcher-Spark/issues/43
+			System.out.println( "\nDebugging ViewDescriptions ... " );
+			for ( final ViewId v : pair.getA() )
+			{
+				System.out.println( "ViewId=" + Group.pvid( v ) );
+				ViewDescription vd = data.getSequenceDescription().getViewDescription( v );
+				System.out.println( "ViewDescription=" + Group.pvid( vd ) );
+				System.out.println( "ViewSetup=" + vd.getViewSetup() );
+				System.out.println( "ViewSetup.getAttributes()=" + vd.getViewSetup().getAttributes() );
+				System.out.println( "ViewSetup.getAttributes().size()=" + vd.getViewSetup().getAttributes().size() );
+			}
+
+			for ( final ViewId v : pair.getB() )
+			{
+				System.out.println( "ViewId=" + Group.pvid( v ) );
+				ViewDescription vd = data.getSequenceDescription().getViewDescription( v );
+				System.out.println( "ViewDescription=" + Group.pvid( vd ) );
+				System.out.println( "ViewSetup=" + vd.getViewSetup() );
+				System.out.println( "ViewSetup.getAttributes()=" + vd.getViewSetup().getAttributes() );
+				System.out.println( "ViewSetup.getAttributes().size()=" + vd.getViewSetup().getAttributes().size() );
+			}
+
 
 			if (nonTranslationsEqual)
 			{

@@ -72,6 +72,7 @@ import net.imglib2.util.ValuePair;
 import net.imglib2.view.Views;
 import net.preibisch.bigstitcher.spark.abstractcmdline.AbstractSelectableViews;
 import net.preibisch.bigstitcher.spark.detection.LazyBackgroundSubtract;
+import net.preibisch.bigstitcher.spark.fusion.OverlappingViews;
 import net.preibisch.bigstitcher.spark.util.Import;
 import net.preibisch.bigstitcher.spark.util.Spark;
 import net.preibisch.bigstitcher.spark.util.ViewUtil;
@@ -94,6 +95,7 @@ import net.preibisch.mvrecon.process.interestpointdetection.methods.dog.DoGParam
 import net.preibisch.mvrecon.process.interestpointregistration.pairwise.constellation.grouping.Group;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
+import scala.Tuple2;
 import scala.Tuple3;
 import scala.Tuple4;
 import util.Grid;
@@ -123,8 +125,11 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 	@Option(names = { "--localization" }, description = "Subpixel localization method, NONE or QUADRATIC (default: QUADRATIC)")
 	protected Localization localization = Localization.QUADRATIC;
 
-	@Option(names = { "--overlappingOnly" }, description = "only find interest points in areas that currently overlap with another view (default: false)")
+	@Option(names = { "--overlappingOnly" }, description = "only find interest points in areas that currently overlap with another view. WARNING: this is usually only useful when running it on a single channel/timepoint, otherwise they usually fully overlap (default: false)")
 	protected boolean overlappingOnly = false;
+
+	@Option(names = { "--onlyCompareOverlapTiles" }, description = "if --overlappingOnly is selected, only test overlap for the Tile attribute; you might need this if you have multiple channels/timepoints (default: false)")
+	protected boolean onlyCompareOverlapTiles = false;
 
 	@Option(names = { "--storeIntensities" }, description = "creates an additional N5 dataset with the intensities of each detection, linearly interpolated (default: false)")
 	protected boolean storeIntensities = false;
@@ -213,6 +218,7 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 		System.out.println( "downsampleXY: " + downsampleXY );
 		System.out.println( "downsampleZ: " + downsampleZ );
 		System.out.println( "overlappingOnly: " + onlyOverlappingRegions );
+		System.out.println( "onlyCompareOverlapTiles: " + onlyCompareOverlapTiles );
 		System.out.println( "prefetching: " + prefetch );
 		if ( maxSpots > 0 ) {
 			System.out.println( "maxSpots: " + maxSpots );
@@ -227,12 +233,55 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 		//
 		final ArrayList< Pair< ViewId, Interval > > toProcess = new ArrayList<>();
 
-		long maxIntervalSize = 0;
+		// assemble all pairs for parallelization with Spark
+		final ArrayList< Tuple2< ViewId, ViewId > > metadataJobs = new ArrayList<>();
 
-		for ( final ViewId viewId : viewIdsGlobal )
+		for ( final ViewId viewDesc : viewIdsGlobal )
 		{
-			final ViewDescription vd = dataGlobal.getSequenceDescription().getViewDescription( viewId );
-			final ImgLoader imgLoader = dataGlobal.getSequenceDescription().getImgLoader();
+			final ViewId viewId = new ViewId( viewDesc.getTimePointId(), viewDesc.getViewSetupId() );
+
+			if ( onlyOverlappingRegions )
+			{
+				for ( final ViewId otherViewId : OverlappingViews.findAllOverlappingViewsFor( viewId, dataGlobal, viewIdsGlobal ) )
+				{
+					if ( !otherViewId.equals( viewId ) )
+					{
+						if ( onlyCompareOverlapTiles )
+						{
+							final ViewDescription vd = dataGlobal.getSequenceDescription().getViewDescription( viewId );
+							final ViewDescription othervd = dataGlobal.getSequenceDescription().getViewDescription( otherViewId );
+							if ( viewId.getTimePointId() == otherViewId.getTimePointId() && vd.getViewSetup().getChannel().getId() == othervd.getViewSetup().getChannel().getId() )
+								metadataJobs.add( new Tuple2<>( viewId, new ViewId( otherViewId.getTimePointId(), otherViewId.getViewSetupId() ) ) );
+						}
+						else
+						{
+							metadataJobs.add( new Tuple2<>( viewId, new ViewId( otherViewId.getTimePointId(), otherViewId.getViewSetupId() ) ) );
+						}
+					}
+				}
+			}
+			else
+			{
+				metadataJobs.add( new Tuple2<>( viewId, null ) );
+			}
+		}
+
+		final SparkConf conf = new SparkConf().setAppName("SparkInterestPointDetection");
+
+		if ( localSparkBindAddress )
+			conf.set("spark.driver.bindAddress", "127.0.0.1");
+
+		final JavaSparkContext sc = new JavaSparkContext(conf);
+		sc.setLogLevel("ERROR");
+
+		final JavaRDD<Tuple2<ViewId, ViewId>> metadataJobsSpark = sc.parallelize( metadataJobs, Math.min( Spark.maxPartitions, metadataJobs.size() ) );
+
+		final JavaRDD< ArrayList< Tuple3< ViewId, long[], long[] > > > metadataJobRDD = metadataJobsSpark.map( metaData ->
+		{
+			final SpimData2 dataLocal = Spark.getSparkJobSpimData2( xmlURI );
+
+			final ViewDescription vd = dataLocal.getSequenceDescription().getViewDescription( metaData._1() );
+			final ImgLoader imgLoader = dataLocal.getSequenceDescription().getImgLoader();
 
 			// load mipmap transform and bounds
 			// TODO: can we load the dimensions without (Virtually) opening the image?
@@ -242,63 +291,74 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 					new long[] { downsampleXY, downsampleXY, downsampleZ },
 					true );
 
-			// only find interest points in regions that are currently overlapping with another view
-			if ( onlyOverlappingRegions )
+			final ArrayList< Tuple3< ViewId, long[], long[] > > resultIntervals = new ArrayList<>();
+
+			if ( overlappingOnly )
 			{
-				final ArrayList< Interval > allIntervals = new ArrayList<>();
+				final ViewId otherViewId = metaData._2();
 
 				final AffineTransform3D mipmapTransform = input.getB(); // maps downsampled image into global coordinate system
 				final AffineTransform3D t1 = mipmapTransform.inverse(); // maps global coordinates into coordinate system of the downsampled image
 
-				for ( final ViewId otherViewId : viewIdsGlobal )
+				//
+				// does it overlap?
+				//
+				final Dimensions dim = ViewUtil.getDimensions( dataLocal, vd );
+				final Dimensions dimOtherViewId = ViewUtil.getDimensions( dataLocal, otherViewId );
+				final ViewDescription vdOtherViewId = dataLocal.getSequenceDescription().getViewDescription( vd );
+
+				final ViewRegistration reg = ViewUtil.getViewRegistration( dataLocal, vd );
+				final ViewRegistration regOtherViewId = ViewUtil.getViewRegistration( dataLocal, otherViewId );
+
+				// load other mipmap transform
+				final AffineTransform3D mipmapTransformOtherViewId = new AffineTransform3D();
+				openAndDownsample(imgLoader, vdOtherViewId, mipmapTransformOtherViewId, new long[] { downsampleXY, downsampleXY, downsampleZ }, true, true );
+
+				// map the other view into the local coordinate space of the view we find interest points in
+				// apply inverse of the mipmap transform of each
+				final AffineTransform3D t2 = regOtherViewId.getModel().preConcatenate( reg.getModel().inverse() ).preConcatenate( mipmapTransformOtherViewId.inverse() );
+
+				final Interval boundingBox = Intervals.smallestContainingInterval( t1.estimateBounds(new FinalInterval( dim ) ) );
+				final Interval boundingBoxOther = Intervals.smallestContainingInterval( t2.estimateBounds( new FinalInterval( dimOtherViewId ) ) );
+
+				if ( ViewUtil.overlaps( boundingBox, boundingBoxOther ) )
 				{
-					if ( otherViewId.equals( viewId ) )
-						continue;
+					final Interval intersectionBoxes = Intervals.intersect( boundingBox, boundingBoxOther );
+					final Interval intersection = Intervals.intersect( input.getA(), intersectionBoxes ); // make sure it fits (e.g. rounding errors)
 
-					//
-					// does it overlap?
-					//
-					final Dimensions dim = ViewUtil.getDimensions( dataGlobal, viewId );
-					final Dimensions dimOtherViewId = ViewUtil.getDimensions( dataGlobal, otherViewId );
-					final ViewDescription vdOtherViewId = dataGlobal.getSequenceDescription().getViewDescription( viewId );
+					//final long size = ViewUtil.size( intersection );
+					//System.out.println( "intersectionBoxes=" + Util.printInterval( intersectionBoxes ) );
+					//System.out.println( "intersection=" + Util.printInterval( intersection ) + ", size (#px)=" + size );
+					//maxIntervalSize = Math.max( maxIntervalSize, size );
 
-					final ViewRegistration reg = ViewUtil.getViewRegistration( dataGlobal, viewId );
-					final ViewRegistration regOtherViewId = ViewUtil.getViewRegistration( dataGlobal, otherViewId );
-
-					// load other mipmap transform
-					final AffineTransform3D mipmapTransformOtherViewId = new AffineTransform3D();
-					openAndDownsample(imgLoader, vdOtherViewId, mipmapTransformOtherViewId, new long[] { downsampleXY, downsampleXY, downsampleZ }, true, true );
-
-					// map the other view into the local coordinate space of the view we find interest points in
-					// apply inverse of the mipmap transform of each
-					final AffineTransform3D t2 = regOtherViewId.getModel().preConcatenate( reg.getModel().inverse() ).preConcatenate( mipmapTransformOtherViewId.inverse() );
-
-					final Interval boundingBox = Intervals.smallestContainingInterval( t1.estimateBounds(new FinalInterval( dim ) ) );
-					final Interval boundingBoxOther = Intervals.smallestContainingInterval( t2.estimateBounds( new FinalInterval( dimOtherViewId ) ) );
-
-					if ( ViewUtil.overlaps( boundingBox, boundingBoxOther ) )
-					{
-						final Interval intersectionBoxes = Intervals.intersect( boundingBox, boundingBoxOther );
-						final Interval intersection = Intervals.intersect( input.getA(), intersectionBoxes ); // make sure it fits (e.g. rounding errors)
-
-						final long size = ViewUtil.size( intersection );
-
-						//System.out.println( "intersectionBoxes=" + Util.printInterval( intersectionBoxes ) );
-						System.out.println( "intersection=" + Util.printInterval( intersection ) + ", size (#px)=" + size );
-
-						maxIntervalSize = Math.max( maxIntervalSize, size );
-
-						allIntervals.add( intersection );
-					}
+					resultIntervals.add( new Tuple3<>( metaData._1(), intersection.minAsLongArray(), intersection.maxAsLongArray() ) );
 				}
 
-				// TODO: some sort of intersections might be useful
-				// find the sum of intersections ...
-				allIntervals.forEach( interval -> toProcess.add( new ValuePair<>( viewId, interval ) ) );
 			}
 			else
 			{
-				toProcess.add( new ValuePair<>( viewId, new FinalInterval( input.getA() ) ) );
+				resultIntervals.add( new Tuple3<>( metaData._1(), input.getA().minAsLongArray(), input.getA().maxAsLongArray() ));
+			}
+
+			return resultIntervals;
+		});
+
+		metadataJobRDD.collect().forEach(
+				l -> l.forEach(
+							md -> toProcess.add(new ValuePair<ViewId, Interval>(md._1(), new FinalInterval(md._2(), md._3())))));
+
+		long maxIntervalSize = 0;
+
+		if ( overlappingOnly )
+		{
+			for ( final Pair<ViewId, Interval> pair : toProcess )
+			{
+				final long size = ViewUtil.size( pair.getB() );
+	
+				//System.out.println( "intersectionBoxes=" + Util.printInterval( intersectionBoxes ) );
+				//System.out.println( "intersection=" + Util.printInterval( interval ) + ", size (#px)=" + size );
+	
+				maxIntervalSize = Math.max( maxIntervalSize, size );
 			}
 		}
 
@@ -328,17 +388,9 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 			});
 		}
 
-		System.out.println( "Total number of jobs: " + sparkProcess.size() );
-		
-		final SparkConf conf = new SparkConf().setAppName("SparkInterestPointDetection");
+		System.out.println( "Total number of jobs for interest point detection: " + sparkProcess.size() );
 
-		if ( localSparkBindAddress )
-			conf.set("spark.driver.bindAddress", "127.0.0.1");
-
-		final JavaSparkContext sc = new JavaSparkContext(conf);
-		sc.setLogLevel("ERROR");
-
-		final JavaRDD<Tuple3<int[], long[], long[][] >> rddJob = sc.parallelize( sparkProcess ).repartition( sparkProcess.size()  );
+		final JavaRDD<Tuple3<int[], long[], long[][] >> rddJob = sc.parallelize( sparkProcess, Math.min( Spark.maxPartitions, sparkProcess.size() ) );
 
 		// return ViewId, interval, locations, intensities
 		final JavaRDD< Tuple4<int[], long[][], double[][], double[] > > rddResult = rddJob.map( serializedInput ->
@@ -724,6 +776,8 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 			}
 			else
 			{
+				interestPoints.put(viewId, new ArrayList<>());
+
 				System.out.println( Group.pvid( viewId ) + ": no points found." );
 				final ArrayList< InterestPoint > myIpsNewId = new ArrayList<>();
 				interestPoints.put(viewId, myIpsNewId);
@@ -732,16 +786,20 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 
 		if ( !dryRun )
 		{
-			// save interest points
-			for ( final ViewId viewId : viewIds )
+			// save interest points for ALL views, not only those where we found points
+			for ( final ViewId viewId : viewIdsGlobal /*viewIds*/ )
 			{
 				System.out.println( "Saving interest point '" + label + "' N5 for " + Group.pvid(viewId) + " ... " );
 				
 				final InterestPoints ipl = InterestPoints.newInstance( dataGlobal.getBasePathURI(), viewId, label );
-	
+
+				// otherwise they are not saved into the XML and into the N5
+				if ( interestPoints.get( viewId ) == null )
+					interestPoints.put( viewId, new ArrayList<>() );
+
 				ipl.setInterestPoints( interestPoints.get( viewId ) );
 				ipl.setCorrespondingInterestPoints( new ArrayList< CorrespondingInterestPoints >() );
-	
+
 				ipl.saveInterestPoints( true );
 				ipl.saveCorrespondingInterestPoints( true );
 
