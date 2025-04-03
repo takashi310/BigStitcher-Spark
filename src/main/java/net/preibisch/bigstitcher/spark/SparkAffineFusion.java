@@ -400,6 +400,13 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 											anisotropyFactor,
 											Double.NaN );
 
+							final HashMap< ViewId, AffineTransform3D > orig_registrations =
+									TransformVirtual.adjustAllTransforms(
+											viewIds,
+											dataLocal.getViewRegistrations().getViewRegistrations(),
+											Double.NaN,
+											Double.NaN );
+
 							final Converter conv;
 							final Type type;
 							final boolean uint8, uint16;
@@ -444,7 +451,7 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 							Arrays.setAll( fusedBlockMax, d -> superBlockOffset[ d ] + superBlockSize[ d ] - 1 );
 
 							final List< ViewId > overlappingViews =
-									OverlappingViews.findOverlappingViews( dataLocal, viewIds, registrations, fusedBlock );
+									OverlappingViews.findOverlappingViews( dataLocal, viewIds, orig_registrations, fusedBlock );
 
 							final RandomAccessibleInterval img;
 
