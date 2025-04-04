@@ -237,10 +237,8 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 		final DataType dataType = driverVolumeWriter.getAttribute( "/", "Bigstitcher-Spark/DataType", DataType.class );
 
 		final long[] orig_bbMin = driverVolumeWriter.getAttribute( "/", "Bigstitcher-Spark/Boundingbox_min", long[].class );
-		final long[] orig_bbMax = driverVolumeWriter.getAttribute( "/", "Bigstitcher-Spark/Boundingbox_max", long[].class );
-		orig_bbMin[ 2 ] = Math.round( Math.floor( orig_bbMin[ 2 ] * anisotropyFactor ) );
-		orig_bbMax[ 2 ] = Math.round( Math.ceil( orig_bbMax[ 2 ] * anisotropyFactor ) );
-		final BoundingBox origBoundingBox = new BoundingBox( new FinalInterval( orig_bbMin, orig_bbMax ) );
+		if ( !Double.isNaN( anisotropyFactor ) )
+			orig_bbMin[ 2 ] = Math.round( Math.floor( orig_bbMin[ 2 ] * anisotropyFactor ) );
 
 		System.out.println( "FusionFormat: " + fusionFormat );
 		System.out.println( "Input XML: " + xmlURI );
@@ -248,7 +246,6 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 		System.out.println( "numTimepoints of fused dataset(s): " + numTimepoints );
 		System.out.println( "numChannels of fused dataset(s): " + numChannels );
 		System.out.println( "BoundingBox: " + boundingBox );
-		System.out.println( "OrigBoundingBox: " + origBoundingBox );
 		System.out.println( "preserveAnisotropy: " + preserveAnisotropy );
 		System.out.println( "anisotropyFactor: " + anisotropyFactor );
 		System.out.println( "blockSize: " + Arrays.toString( blockSize ) );
