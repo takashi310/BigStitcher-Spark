@@ -36,11 +36,11 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.janelia.saalfeldlab.n5.DataType;
-import org.janelia.saalfeldlab.n5.N5Exception;
 import org.janelia.saalfeldlab.n5.N5FSWriter;
+import org.janelia.saalfeldlab.n5.N5Reader;
 import org.janelia.saalfeldlab.n5.N5Writer;
 import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
-import org.janelia.saalfeldlab.n5.universe.N5Factory.StorageFormat;
+import org.janelia.saalfeldlab.n5.universe.StorageFormat;
 
 import mpicbg.spim.data.SpimDataException;
 import mpicbg.spim.data.sequence.SequenceDescription;
@@ -204,10 +204,28 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 			System.out.println( "Format " + storageType + " will be used to open " + outPathURI );
 		}
 
+		// test that the container exists
+		try( final N5Reader r = URITools.instantiateN5Reader( storageType, outPathURI  ) )
+		{
+			System.out.println( "Found container '" + outPathURI + "'.");
+		}
+		catch ( Exception e )
+		{
+			System.out.println( "Exception: " + e);
+			System.out.println( "Error, container '" + outPathURI + "' does not exist. Please create it with create-fusion-container.");
+			return null;
+		}
+
 		final N5Writer driverVolumeWriter = N5Util.createN5Writer( outPathURI, storageType );
 
 		final String fusionFormat = driverVolumeWriter.getAttribute( "/", "Bigstitcher-Spark/FusionFormat", String.class );
 
+		if ( fusionFormat == null )
+		{
+			System.out.println( "Could not load 'Bigstitcher-Spark/FusionFormat' from metadata of specified output '" + outPathURI + "'.");
+			System.out.println( "Note: this metadata is created by ./create-fusion-container in the previous step." );
+			return null;
+		}
 		final boolean bdv = fusionFormat.toLowerCase().contains( "BDV" );
 
 		final URI xmlURI = driverVolumeWriter.getAttribute( "/", "Bigstitcher-Spark/InputXML", URI.class );
@@ -457,6 +475,9 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 							final List< ViewId > overlappingViews =
 									OverlappingViews.findOverlappingViews( dataLocal, viewIds, orig_registrations, fusedBlock );
 
+							if ( overlappingViews.size() == 0 )
+								return;
+
 							final RandomAccessibleInterval img;
 
 							if ( masks )
@@ -556,6 +577,8 @@ public class SparkAffineFusion extends AbstractInfrastructure implements Callabl
 
 							final N5Writer driverVolumeWriterLocal = N5Util.createN5Writer( outPathURI, storageType );
 
+							// TODO: is this multithreaded??
+							// TODO: should we catch the N5 exception and throw a general one?
 							N5Utils.saveBlock(sourceGridBlock, driverVolumeWriterLocal, mrInfo[ 0 ].dataset, gridOffset );
 
 							if ( N5Util.sharedHDF5Writer == null )
