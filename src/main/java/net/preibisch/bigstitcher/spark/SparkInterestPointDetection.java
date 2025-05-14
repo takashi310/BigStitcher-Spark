@@ -641,7 +641,7 @@ public class SparkInterestPointDetection extends AbstractSelectableViews impleme
 		for ( final Tuple3<ViewId, long[][], String> tuple : results )
 		{
 			final ViewId viewId = tuple._1();
-			
+
 			//if ( points != null && points.length > 0 )
 			if ( n5Writer.datasetExists( tempDataset + "/" + tuple._3() + "/points" ))
 			{
